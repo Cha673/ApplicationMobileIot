@@ -1,0 +1,12 @@
+name: Vérifier le kit MQTT
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  kit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Recette complète dans Docker
+        run: python3 tests/acceptance.py

@@ -1,0 +1,5 @@
+[
+  {"device_id": "sensor-001", "room_id": "salle-203", "label": "Salle 203"},
+  {"device_id": "sensor-002", "room_id": "salle-204", "label": "Salle 204"},
+  {"device_id": "sensor-003", "room_id": "salle-205", "label": "Salle 205"}
+]
