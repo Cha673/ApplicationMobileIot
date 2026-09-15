@@ -1,4 +1,4 @@
-import { Pool } from '../../node_modules/@types/pg';
+import { Pool } from 'pg';
 import type { MeasurementRepository, DeviceRepository } from '../domain/repositories';
 import type { Measurement, Device } from '../domain/types';
 
