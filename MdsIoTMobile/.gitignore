@@ -1,8 +1,0 @@
-.env
-__pycache__/
-*.pyc
-.venv/
-test-results/
-acceptance-local.log
-node_modules/
-dist/
