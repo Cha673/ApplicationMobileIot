@@ -1,4 +1,44 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-campus}
+      POSTGRES_USER: ${POSTGRES_USER:-campus}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-campus-demo}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-campus} -d ${POSTGRES_DB:-campus}"]
+      interval: 5s
+      timeout: 4s
+      retries: 12
+    restart: unless-stopped
+
+  backend:
+    build: ./backend
+    environment:
+      MQTT_HOST: mosquitto
+      MQTT_USER: backend
+      MQTT_PASSWORD: ${BACKEND_PASSWORD:-backend-demo}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-campus}
+      POSTGRES_USER: ${POSTGRES_USER:-campus}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-campus-demo}
+      DEVICES_PATH: /app/devices.json
+    volumes:
+      - ./devices.json:/app/devices.json:ro
+    ports:
+      - "0.0.0.0:${API_PORT:-3000}:3000"
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
   mosquitto:
     image: eclipse-mosquitto:2.0.22
     entrypoint: ["/bin/sh", "/mosquitto/config/start.sh"]

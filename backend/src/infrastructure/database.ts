@@ -1,9 +1,6 @@
-import { Pool } from "pg";
-import type {
-  MeasurementRepository,
-  DeviceRepository,
-} from "../domain/repositories";
-import type { Measurement, Device } from "../domain/types";
+import { Pool } from 'pg';
+import type { MeasurementRepository, DeviceRepository } from '../domain/repositories';
+import type { Measurement, Device } from '../domain/types';
 
 export function createPool(): Pool {
   return new Pool({
