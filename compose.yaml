@@ -7,7 +7,7 @@ services:
       BACKEND_PASSWORD: ${BACKEND_PASSWORD:-backend-demo}
       TEACHER_PASSWORD: ${TEACHER_PASSWORD:-teacher-demo}
     ports:
-      - "127.0.0.1:${MQTT_PORT:-1883}:1883"
+      - "127.0.0.1:${MQTT_PORT:-1884}:1883"
     volumes:
       - ./mosquitto:/mosquitto/config:ro
       - broker-data:/mosquitto/data

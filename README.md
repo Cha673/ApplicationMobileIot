@@ -48,7 +48,7 @@ docker compose run --rm tools watch --topic "campus/v1/devices/+/telemetry" --co
 
 | Où tourne le backend ? | Hôte MQTT | Port |
 |---|---|---|
-| Directement sur votre ordinateur | `localhost` | `1883` |
+| Directement sur votre ordinateur | `localhost` | `1884` |
 | Service ajouté dans ce Compose | `mosquitto` | `1883` |
 
 Compte : `backend` / mot de passe initial : `backend-demo`. Abonnez-vous aux topics de télémétrie, état, disponibilité et résultat définis dans [le contrat MQTT](docs/contrat-mqtt.md). Publiez les commandes sur le topic de l’objet concerné.
