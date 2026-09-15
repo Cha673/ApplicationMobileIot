@@ -1,0 +1,17 @@
+export interface Measurement {
+  messageId: string;
+  deviceId: string;
+  roomId: string;
+  observedAt: string;
+  receivedAt: string;
+  temperature: number;
+  co2: number;
+}
+
+export interface Device {
+  deviceId: string;
+  roomId: string;
+  label: string;
+  isOnline: boolean;
+  lastSeenAt: string | null;
+}

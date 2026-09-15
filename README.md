@@ -1,189 +1,216 @@
-# Campus connecté — kit IoT & Mobile
+# Campus connecté — Backend IoT + Mobile
 
-Kit étudiant du projet **M2 Applications mobiles et objets connectés**. Il fournit un broker Mosquitto et des objets simulés ; vous réalisez **le backend, le stockage, l’API et l’application mobile**, dans les technologies de votre choix.
+Système de supervision d'un campus connecté : température, CO₂ et commande de ventilation.
 
-## Ce que vous recevez
+## Architecture
 
-- Trois objets (`sensor-001` à `sensor-003`), associés initialement aux salles 203 à 205.
-- Des mesures de température (°C) et de CO₂ (ppm), toutes les deux secondes par défaut.
-- Une ventilation simulée qui fait diminuer progressivement le CO₂ lorsqu’elle est activée.
-- Un contrat MQTT documenté, des incidents reproductibles et des outils de diagnostic.
-- Des tests unitaires, des tests MQTT et une recette de coupure/reconnexion Docker.
-
-```mermaid
-flowchart LR
-    S[Objets simulés fournis] <-->|MQTT| M[Mosquitto fourni]
-    M <-->|MQTT| B[Backend à développer]
-    B <--> D[Stockage à développer]
-    B <-->|API| A[Application mobile à développer]
+```
+Simulateur (Python) → Mosquitto (MQTT) → Backend (Node.js/TS) → PostgreSQL
+                                                              ↕ API REST :3000
+                                                    Application mobile (React Native)
 ```
 
-Le simulateur est écrit en Python pour rendre le kit lisible. **Cela n’impose pas Python pour votre backend.** Les outils de diagnostic ne stockent pas les mesures et ne constituent pas une solution backend.
+Le backend s'abonne aux topics MQTT du simulateur, stocke les mesures et expose une API REST consommée par le mobile.
 
-## Démarrer en trois étapes
+---
 
-Prérequis : Git et Docker avec la commande `docker compose` (Docker Desktop démarré, conteneurs Linux sur Windows). Aucun Python local n’est nécessaire pour utiliser le kit et lancer les tests dans Docker.
+## Lancer le projet
+
+**Prérequis :** Docker Desktop démarré (conteneurs Linux).
 
 ```sh
-git clone https://github.com/LargeGaultier/MdsIoTMobile.git
-cd MdsIoTMobile
+# 1. Cloner le dépôt
+git clone <votre-repo>
+cd <votre-repo>
+
+# 2. Démarrer tout le système (Mosquitto + simulateur + backend)
 docker compose up -d --build --wait
-```
 
-Le premier démarrage télécharge les images et construit le simulateur. Ensuite :
-
-```sh
+# 3. Vérifier que tout tourne
 docker compose ps
-docker compose logs --tail 30 simulator
-docker compose run --rm --build tools watch --count 10
 ```
 
-Vous devez voir les messages des trois objets. L’outil affiche le topic, le contenu JSON et le drapeau `retained`. Pour ne voir que les mesures :
+Les quatre services doivent être `running` :
+- `mosquitto` — broker MQTT sur le port **1883** (localhost uniquement)
+- `simulator` — produit des mesures toutes les 2 s
+- `postgres` — base de données sur le port **5432** (localhost uniquement)
+- `backend` — API REST sur le port **3000**
+
+---
+
+## Tester que ça fonctionne
+
+### 1. Santé du backend
 
 ```sh
-docker compose run --rm tools watch --topic "campus/v1/devices/+/telemetry" --count 3
+curl http://localhost:3000/api/health
+# → {"status":"ok","timestamp":"2026-09-15T..."}
 ```
 
-## Connecter votre backend
-
-| Où tourne le backend ? | Hôte MQTT | Port |
-|---|---|---|
-| Directement sur votre ordinateur | `localhost` | `1884` |
-| Service ajouté dans ce Compose | `mosquitto` | `1883` |
-
-Compte : `backend` / mot de passe initial : `backend-demo`. Abonnez-vous aux topics de télémétrie, état, disponibilité et résultat définis dans [le contrat MQTT](docs/contrat-mqtt.md). Publiez les commandes sur le topic de l’objet concerné.
-
-Le mobile contacte **votre API**, avec une adresse accessible depuis son terminal. `localhost` sur un téléphone désigne le téléphone, pas votre ordinateur. Le port de votre API et son accès depuis le réseau local sont à configurer dans votre réalisation.
-
-### Comptes pédagogiques
-
-| Compte | Mot de passe initial | Usage |
-|---|---|---|
-| `simulator` | `simulator-demo` | Produire les mesures/états et recevoir les commandes/incidents |
-| `backend` | `backend-demo` | Lire les données des objets et envoyer des commandes |
-| `teacher` | `teacher-demo` | Diagnostic et injection d’incidents |
-
-Les droits sont limités par `mosquitto/acl`. Les permissions de vos utilisateurs métier doivent être vérifiées **dans votre backend** : les comptes MQTT ne remplacent pas ces contrôles.
-
-Ce sont des identifiants publics de démonstration. Le port MQTT est volontairement publié sur **127.0.0.1**, et les échanges du kit local ne sont pas chiffrés. Ce kit n’est pas une configuration de production ; ne l’exposez pas sur Internet. Chaque équipe utilise son propre environnement.
-
-## Tester la ventilation
+### 2. Liste des salles avec dernières mesures
 
 ```sh
-docker compose run --rm tools command sensor-001 on
-docker compose run --rm tools watch --topic "campus/v1/devices/sensor-001/telemetry" --count 5
-docker compose run --rm tools command sensor-001 off
+curl http://localhost:3000/api/rooms
 ```
 
-Le diagnostic envoie une commande avec un identifiant et une expiration, puis attend le résultat de l’objet. `executed` confirme une action **dans le modèle simulé**. En cas d’absence de réponse, l’outil termine en erreur : cela ne constitue pas une preuve que l’action n’a pas eu lieu.
+Réponse attendue (extrait) :
 
-## Provoquer les incidents du cours
+```json
+[
+  {
+    "roomId": "salle-203",
+    "label": "Salle 203",
+    "deviceId": "sensor-001",
+    "isOnline": true,
+    "latestMeasurement": {
+      "temperature": 22.14,
+      "co2": 912,
+      "observedAt": "2026-09-15T10:00:00.000Z"
+    }
+  }
+]
+```
+
+### 3. Détail d'une salle
 
 ```sh
+curl http://localhost:3000/api/rooms/salle-203
+```
+
+### 4. Historique des mesures (50 dernières)
+
+```sh
+curl http://localhost:3000/api/rooms/salle-203/history
+```
+
+### 5. Voir les logs du backend en temps réel
+
+```sh
+docker compose logs -f backend
+# → [mqtt] connected to mosquitto:1883
+# → [init] seeded 3 devices from /app/devices.json
+# → [telemetry] saved: sensor-001 T=22.14°C CO2=912ppm
+# → [availability] sensor-001: online
+```
+
+---
+
+## Déclencher les incidents du simulateur
+
+Ces commandes permettent de tester le comportement du backend face aux incidents IoT.
+
+```sh
+# Mettre sensor-001 en pause (mesures stoppées, connexion maintenue)
 docker compose run --rm tools incident sensor-001 pause
+
+# Reprendre
 docker compose run --rm tools incident sensor-001 resume
+
+# Injecter un doublon (même message_id)
 docker compose run --rm tools incident sensor-001 duplicate
+
+# Injecter une mesure retardée (observed_at - 60 s)
 docker compose run --rm tools incident sensor-001 delay
+
+# Injecter une mesure invalide (co2 = texte)
 docker compose run --rm tools incident sensor-001 invalid
-docker compose run --rm tools incident sensor-001 high-co2
-docker compose run --rm tools incident sensor-001 normal-co2
-docker compose run --rm tools incident sensor-001 no-response
-docker compose run --rm tools incident sensor-001 respond
+
+# Remettre à zéro
 docker compose run --rm tools incident sensor-001 reset
 ```
 
-Chaque ligne est une action indépendante, à déclencher au moment du scénario. La réponse `ok` confirme l’injection de l’incident, pas la réussite du backend étudiant.
-
-| Action | Effet | À vérifier dans votre réalisation |
-|---|---|---|
-| `pause` / `resume` | Arrête/reprend les mesures de cet objet, connexion maintenue | Fraîcheur distincte de la connexion |
-| `duplicate` | Republie la dernière mesure avec le même identifiant | Pas de doublon métier |
-| `delay` | Émet une nouvelle mesure datée de 60 secondes auparavant | Pas de régression du dernier état |
-| `invalid` | Émet une mesure où le CO₂ vaut le texte `invalide` | Rejet/qualification, service toujours disponible |
-| `high-co2` / `normal-co2` | Place le CO₂ à 1800/600 ppm, puis reprend son évolution | Activation et résolution d’alerte |
-| `no-response` / `respond` | Ignore/reprend les commandes ; les commandes ignorées ne sont pas rejouées | Attente bornée et résultat inconnu |
-| `reset` | Reprend les mesures et commandes, CO₂ à 650, ventilation arrêtée | Retour à une situation normale |
-
-`reset` ne vide pas l’historique de votre backend, ni le cache des commandes du simulateur. Chaque nouvelle intention doit avoir un nouvel identifiant de commande.
-
-Interrompre le broker et le relancer :
+### Observer les messages MQTT bruts
 
 ```sh
-docker compose stop mosquitto
-docker compose up -d --wait mosquitto
+# Voir tous les messages (10 derniers)
+docker compose run --rm tools watch --count 10
+
+# Filtrer sur la télémétrie uniquement
+docker compose run --rm tools watch --topic "campus/v1/devices/+/telemetry" --count 3
 ```
 
-Les objets se reconnectent automatiquement. Les mesures ne sont pas produites pendant la déconnexion ; aucune récupération complète de cet intervalle n’est promise. Pour tester un Last Will, `docker compose pause simulator` suspend les trois objets sans déconnexion propre ; attendre environ 8 à 15 secondes, puis `docker compose unpause simulator`.
+---
 
-## Ce qui reste à construire
+## Comment ça fonctionne
 
-1. Valider les messages et décider du traitement des erreurs, retards et doublons.
-2. Conserver l’historique et calculer un dernier état fiable et sa fraîcheur.
-3. Associer les objets aux salles, gérer les utilisateurs et leurs droits.
-4. Suivre les commandes et leurs délais ; produire des alertes sans répétition inutile.
-5. Exposer une API, construire le mobile, son cache et ses parcours réseau/caméra.
-6. Démontrer les scénarios de recette sur le terminal choisi.
+### Trajet d'une mesure
 
-Les valeurs initiales de `room_id` servent de repères. L’affectation de référence dans votre application appartient au backend. Pour le scan QR, le contrat d’association et les contenus à encoder sont fournis dans [docs/association.md](docs/association.md).
-
-## Configuration
-
-Copiez `.env.example` en `.env` si vous souhaitez changer un paramètre (`Copy-Item .env.example .env` dans PowerShell, `cp .env.example .env` sous macOS/Linux). Sans ce fichier, les valeurs pédagogiques par défaut fonctionnent.
-
-- `MQTT_PORT` : port sur l’ordinateur, à changer si 1883 est occupé (ex. 1884).
-- `PUBLISH_INTERVAL` : intervalle en secondes, minimum 0.1, valeur initiale 2.
-- `SIMULATOR_PASSWORD`, `BACKEND_PASSWORD`, `TEACHER_PASSWORD` : identifiants du kit local.
-- `devices.json` : objets et salles, identifiants uniques ; de 1 à 100 objets.
-
-Après modification : `docker compose up -d --build --force-recreate`. Après retrait d’objets, des états retained peuvent rester dans le broker ; utilisez un nouveau projet Compose ou la remise à zéro ci-dessous. La recette automatique utilise le parc initial de trois objets.
-
-## Lancer les tests
-
-Tests du modèle et des échanges MQTT, sur le kit démarré (ils modifient temporairement `sensor-001`) :
-
-```sh
-docker compose run --rm --build tests
+```
+1. Simulateur publie sur campus/v1/devices/sensor-001/telemetry (QoS 1)
+2. Mosquitto route le message au backend
+3. TelemetryService.processTelemetry valide les champs requis
+4. Si message_id déjà connu → doublon ignoré (log émis)
+5. PgMeasurementRepository.save → INSERT … ON CONFLICT DO NOTHING dans PostgreSQL
+6. GET /api/rooms/salle-203 → retourne latestMeasurement depuis PostgreSQL
 ```
 
-Recette complète **isolée**, avec Python 3 sur l’ordinateur :
+### Déduplication
 
-```sh
-python tests/acceptance.py
+Le `message_id` est la clé primaire PostgreSQL. Un doublon QoS 1 ou un incident `duplicate` n'insère rien (`ON CONFLICT DO NOTHING`) et produit juste un log `[telemetry] duplicate skipped`.
+
+### Disponibilité vs fraîcheur
+
+- **Disponibilité** : `isOnline` dans l'API — mis à jour par les messages `availability` MQTT.
+- **Fraîcheur** : date de `observedAt` dans `latestMeasurement` — un capteur peut être connecté (`isOnline: true`) mais en pause (mesures stoppées).
+
+---
+
+## Structure du projet
+
+```
+/
+├── backend/                 ← Backend Node.js/TypeScript
+│   ├── src/
+│   │   ├── domain/          ← types et interfaces (sans dépendances)
+│   │   ├── application/     ← logique métier (TelemetryService)
+│   │   └── infrastructure/  ← MQTT, PostgreSQL, HTTP (Express)
+│   ├── Dockerfile
+│   └── package.json
+├── docs/
+│   ├── architecture.md      ← schéma et décisions d'architecture
+│   ├── J1.md                ← journal J1 avec preuves
+│   ├── decisions/           ← décisions techniques
+│   └── contrat-mqtt.md      ← contrat MQTT du kit
+├── mosquitto/               ← configuration du broker
+├── simulator/               ← simulateur fourni (Python)
+├── compose.yaml             ← stack complète Docker
+└── devices.json             ← liste des capteurs et salles
 ```
 
-Elle crée un projet Docker temporaire sur un port libre, vérifie les mesures, commandes, incidents, droits, accès anonyme refusé, interruption du broker, Last Will et redémarrage du simulateur. Elle supprime uniquement son propre projet et ses volumes à la fin. GitHub Actions lance la même recette à chaque push et pull request.
+---
 
-La validation du kit ne teste pas votre backend ni votre application mobile. Vous devez compléter ces preuves avec vos propres tests.
-
-## Arrêter et remettre à zéro
+## Arrêter / Remettre à zéro
 
 ```sh
+# Arrêter (conserve les données)
 docker compose down
-```
 
-Cette commande conserve le volume du broker. L’état du simulateur et son cache de commandes sont en mémoire : un redémarrage les réinitialise et produit de nouveaux identifiants de mesure.
-
-Pour **effacer les messages conservés du broker** et repartir à zéro :
-
-```sh
+# Remettre à zéro complète (efface les mesures stockées)
 docker compose down -v
 docker compose up -d --build --wait
 ```
 
-## Dépannage
+---
 
-- Docker inaccessible : démarrer Docker Desktop et vérifier le mode conteneurs Linux.
-- Port occupé : changer `MQTT_PORT` dans `.env`, puis recréer les services.
-- Broker non sain : consulter `docker compose logs mosquitto` ; vérifier les variables de mots de passe et les fichiers montés.
-- Pas de mesures : consulter `docker compose logs simulator`, vérifier le compte et les topics, puis `incident sensor-001 reset`.
-- Commande sans retour : vérifier objet, droits, expiration et mode `no-response` ; conserver un résultat inconnu tant qu’il manque une preuve.
-- Changements de code non visibles : relancer avec `--build`.
+## Endpoints API
 
-## Fichiers et références
+| Méthode | Route | Description |
+|---------|-------|-------------|
+| GET | `/api/health` | Santé du backend |
+| GET | `/api/rooms` | Liste des salles avec dernière mesure |
+| GET | `/api/rooms/:roomId` | Détail d'une salle |
+| GET | `/api/rooms/:roomId/history` | Historique des 50 dernières mesures |
+| GET | `/api/devices` | Liste des capteurs avec état de connexion |
 
-- `compose.yaml` et `mosquitto/` : broker, comptes et droits.
-- `simulator/` : modèle physique simplifié et client MQTT.
-- `tools/` : diagnostic en ligne de commande.
-- `tests/` : tests unitaires, réseau et recette Docker.
-- [Contrat MQTT v1](docs/contrat-mqtt.md) : formats et garanties exactes.
-- [Eclipse Paho Python](https://eclipse.dev/paho/files/paho.mqtt.python/html/client.html), [Mosquitto](https://mosquitto.org/man/mosquitto-conf-5.html), [Docker Compose](https://docs.docker.com/compose/how-tos/startup-order/).
+---
+
+## Variables d'environnement
+
+Copier `.env.example` en `.env` pour personnaliser :
+
+| Variable | Défaut | Rôle |
+|----------|--------|------|
+| `MQTT_PORT` | `1883` | Port Mosquitto exposé sur l'hôte |
+| `BACKEND_PASSWORD` | `backend-demo` | Mot de passe MQTT du backend |
+| `PUBLISH_INTERVAL` | `2` | Intervalle de publication du simulateur (secondes) |
+| `POSTGRES_PASSWORD` | `campus-demo` | Mot de passe PostgreSQL |

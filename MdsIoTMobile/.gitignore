@@ -6,6 +6,3 @@ test-results/
 acceptance-local.log
 node_modules/
 dist/
-*.db
-*.db-shm
-*.db-wal
