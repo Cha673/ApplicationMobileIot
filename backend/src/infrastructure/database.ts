@@ -99,6 +99,21 @@ export class PgMeasurementRepository implements MeasurementRepository {
     );
     return result.rows.map(toMeasurement);
   }
+
+  async findAverageTemperatureByDevice(
+    deviceId: string,
+    from: string,
+    to: string,
+  ): Promise<number | null> {
+    const result = await this.pool.query(
+      `SELECT AVG(temperature)::float AS average_temperature
+       FROM measurements
+       WHERE device_id = $1 AND observed_at >= $2 AND observed_at < $3`,
+      [deviceId, from, to],
+    );
+    const average = result.rows[0]?.['average_temperature'];
+    return typeof average === 'number' ? average : null;
+  }
 }
 
 export class PgDeviceRepository implements DeviceRepository {

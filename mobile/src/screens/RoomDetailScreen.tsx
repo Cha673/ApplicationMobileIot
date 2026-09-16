@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 import {
   ActivityIndicator,
   ScrollView,
@@ -27,6 +27,10 @@ export function RoomDetailScreen({ room, onBack }: Props): React.ReactElement {
     queryKey: ['history', room.roomId],
     queryFn: () => fetchRoomHistory(room.roomId),
     refetchInterval: 10000,
+  });
+  const { data: yesterdayAverage, error: averageError } = useQuery({
+    queryKey: ["average-temperature-yesterday", room.roomId],
+    queryFn: () => fetchYesterdayTemperatureAverage(room.roomId),
   });
 
   const appOffline = roomsError !== null && rooms.length > 0;
@@ -58,7 +62,10 @@ export function RoomDetailScreen({ room, onBack }: Props): React.ReactElement {
 
       {offline && (
         <View style={styles.offlineBanner}>
-          <Text style={styles.offlineText}>Mode hors ligne — dernières données connues</Text>
+          <Text style={styles.offlineText}>
+            Mode hors ligne — dernière donnée du{" "}
+            {m ? formatMeasurementTimestamp(m.observedAt) : "date inconnue"}
+          </Text>
         </View>
       )}
 
@@ -75,16 +82,26 @@ export function RoomDetailScreen({ room, onBack }: Props): React.ReactElement {
         <View style={styles.latest}>
           <Text style={styles.sectionTitle}>Dernière mesure</Text>
           <View style={styles.measures}>
-            <MeasureBlock value={`${m.temperature.toFixed(1)}`} unit="°C" label="Température" />
-            <MeasureBlock value={`${Math.round(m.co2)}`} unit="ppm" label="CO₂" />
+            <MeasureBlock
+              value={`${m.temperature.toFixed(1)}`}
+              unit="°C"
+              label="Température"
+            />
+            <MeasureBlock
+              value={`${Math.round(m.co2)}`}
+              unit="ppm"
+              label="CO₂"
+            />
           </View>
           <Text style={styles.observedAt}>
-            Relevée le {new Date(m.observedAt).toLocaleString('fr-FR')}
+            Donnée du {formatMeasurementTimestamp(m.observedAt)}
           </Text>
         </View>
       ) : (
         <View style={styles.noDataBox}>
-          <Text style={styles.noDataText}>Aucune mesure disponible pour cette salle</Text>
+          <Text style={styles.noDataText}>
+            Aucune mesure disponible pour cette salle
+          </Text>
         </View>
       )}
 
@@ -100,7 +117,13 @@ export function RoomDetailScreen({ room, onBack }: Props): React.ReactElement {
 
       <Text style={styles.sectionTitle}>Historique (50 dernières mesures)</Text>
 
-      {isLoading && <ActivityIndicator color="#4285F4" style={{ marginTop: 16 }} />}
+      <Text style={styles.sectionTitle}>
+        {ROOM_HISTORY_LIMIT} dernières valeurs mesurées
+      </Text>
+
+      {isLoading && (
+        <ActivityIndicator color="#4285F4" style={{ marginTop: 16 }} />
+      )}
 
       {error && history.length === 0 && (
         <View style={styles.errorBox}>
@@ -122,9 +145,11 @@ export function RoomDetailScreen({ room, onBack }: Props): React.ReactElement {
       {history.map((entry, index) => (
         <View key={index} style={styles.historyRow}>
           <Text style={styles.historyTime}>
-            {new Date(entry.observedAt).toLocaleTimeString('fr-FR')}
+            {formatMeasurementTimestamp(entry.observedAt)}
           </Text>
-          <Text style={styles.historyValue}>{entry.temperature.toFixed(1)} °C</Text>
+          <Text style={styles.historyValue}>
+            {entry.temperature.toFixed(1)} °C
+          </Text>
           <Text style={styles.historyValue}>{Math.round(entry.co2)} ppm</Text>
         </View>
       ))}
@@ -132,7 +157,15 @@ export function RoomDetailScreen({ room, onBack }: Props): React.ReactElement {
   );
 }
 
-function MeasureBlock({ value, unit, label }: { value: string; unit: string; label: string }): React.ReactElement {
+function MeasureBlock({
+  value,
+  unit,
+  label,
+}: {
+  value: string;
+  unit: string;
+  label: string;
+}): React.ReactElement {
   return (
     <View style={styles.measureBlock}>
       <View style={styles.measureRow}>
@@ -145,7 +178,7 @@ function MeasureBlock({ value, unit, label }: { value: string; unit: string; lab
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f5f5' },
+  container: { flex: 1, backgroundColor: "#f5f5f5" },
   content: { padding: 16, paddingBottom: 32 },
   topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   backBtn: {},
@@ -153,15 +186,20 @@ const styles = StyleSheet.create({
   updatingRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   updatingText: { fontSize: 12, color: '#4285F4' },
   offlineBanner: {
-    backgroundColor: '#f39c12',
+    backgroundColor: "#f39c12",
     paddingVertical: 6,
     paddingHorizontal: 12,
     borderRadius: 8,
     marginBottom: 12,
   },
-  offlineText: { color: '#fff', fontSize: 12, fontWeight: '600', textAlign: 'center' },
-  title: { fontSize: 24, fontWeight: '700', color: '#1a1a1a', marginBottom: 4 },
-  deviceId: { fontSize: 13, color: '#888', marginBottom: 12 },
+  offlineText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "600",
+    textAlign: "center",
+  },
+  title: { fontSize: 24, fontWeight: "700", color: "#1a1a1a", marginBottom: 4 },
+  deviceId: { fontSize: 13, color: "#888", marginBottom: 12 },
   statusBanner: { padding: 10, borderRadius: 8, marginBottom: 16 },
   bannerOnline: { backgroundColor: '#e8f5e9' },
   bannerOffline: { backgroundColor: '#fde8e8' },
@@ -190,14 +228,14 @@ const styles = StyleSheet.create({
   errorBoxDetail: { fontSize: 11, color: '#999', fontStyle: 'italic' },
   emptyText: { color: '#aaa', fontStyle: 'italic', marginTop: 8 },
   historyRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    backgroundColor: '#fff',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    backgroundColor: "#fff",
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 8,
     marginBottom: 4,
   },
-  historyTime: { color: '#666', fontSize: 13 },
-  historyValue: { color: '#1a1a1a', fontSize: 13, fontWeight: '500' },
+  historyTime: { color: "#666", fontSize: 13 },
+  historyValue: { color: "#1a1a1a", fontSize: 13, fontWeight: "500" },
 });

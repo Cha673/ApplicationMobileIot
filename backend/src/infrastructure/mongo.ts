@@ -75,6 +75,21 @@ export class MongoMeasurementRepository implements SyncableMeasurementRepository
     return docs.map(fromDoc);
   }
 
+  async findAverageTemperatureByDevice(
+    deviceId: string,
+    from: string,
+    to: string,
+  ): Promise<number | null> {
+    const result = await this.col
+      .aggregate<{ average_temperature?: number }>([
+        { $match: { device_id: deviceId, observed_at: { $gte: from, $lt: to } } },
+        { $group: { _id: null, average_temperature: { $avg: '$temperature' } } },
+      ])
+      .toArray();
+    const average = result[0]?.average_temperature;
+    return typeof average === 'number' ? average : null;
+  }
+
   async findUnsynced(limit: number): Promise<Measurement[]> {
     const docs = await this.col
       .find({ synced: false })

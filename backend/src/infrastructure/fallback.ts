@@ -40,4 +40,17 @@ export class FallbackMeasurementRepository implements MeasurementRepository {
       return this.fallback.findHistoryByDevice(deviceId, limit);
     }
   }
+
+  async findAverageTemperatureByDevice(
+    deviceId: string,
+    from: string,
+    to: string,
+  ): Promise<number | null> {
+    try {
+      return await this.primary.findAverageTemperatureByDevice(deviceId, from, to);
+    } catch {
+      console.warn('[fallback] postgres unavailable, reading average from mongo');
+      return this.fallback.findAverageTemperatureByDevice(deviceId, from, to);
+    }
+  }
 }

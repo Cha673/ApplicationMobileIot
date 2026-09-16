@@ -9,7 +9,7 @@ import {
   View,
 } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { fetchRooms, type Room } from '../api';
+import { fetchRooms, formatMeasurementTimestamp, type Room } from '../api';
 
 interface Props {
   onSelectRoom: (room: Room) => void;
@@ -109,7 +109,7 @@ function RoomRow({ room, appOffline }: { room: Room; appOffline: boolean }): Rea
       )}
       {m && (
         <Text style={styles.timestamp}>
-          {new Date(m.observedAt).toLocaleTimeString('fr-FR')}
+          Donnée du {formatMeasurementTimestamp(m.observedAt)}
         </Text>
       )}
     </View>
