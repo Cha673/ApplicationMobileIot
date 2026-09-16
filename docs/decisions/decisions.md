@@ -20,6 +20,36 @@ L'API expose un `FallbackMeasurementRepository` : les requêtes lisent PostgreSQ
 - Éviter qu'une indisponibilité de PostgreSQL ne bloque la réception des mesures.
 - Disposer d'un journal complet de tous les messages bruts dans MongoDB, y compris les doublons rejetés.
 
+### Problèmes identifiés sous charge — pistes de correction
+
+Pendant les tests de stress (1000 messages + 250 doublons), on a découvert trois problèmes.
+
+---
+
+**Problème 1 — Perte silencieuse de messages **
+
+Le client MQTT a une file d'attente limitée à 100 messages. Quand on depasse cette limite, les messages suivants ne s'envoient pas. Nous n'avons pas de messages d'alertes pour dire que des messages disparaissent. Nous perdons donc des donnees sans etre au courant.
+
+Il faudrait ajouter un outil comme Redis, qui gere la file d'attente pour que le backend puisse la traiter a son rythme.
+
+---
+
+**Problème 2 — Plafond de débit : 100 messages/seconde**
+
+Actuellement, nous avons deux ecritures de chaque message : une premiere sur MongoDB et ensuite sur PostgreSQL avec une synchronisation toutes les 5 secondes des messages de mongoDB sur PostgreSQL. Lorsqu'il y a beaucoup de messages, il faut un minimum de temps avec que l'ensemble des donnees soient visibles dans l'API.
+
+---
+
+**Problème 3 — L'API cache l'état réel du pipeline**
+
+`GET /history` retourne maximum 50 lignes. On ne peut pas savoir depuis l'extérieur combien de messages sont en attente dans MongoDB, si la synchronisation est à jour, ou si on a perdu des données.
+
+**Ce qu'il faudrait faire :**
+Il faudrait ajouter un endpoint avec l'ensemble des messages qu'il reste a synchroniser.
+
+---
+
 ### Cache persistant côté mobile
 
 TanStack Query v5 est configuré avec `networkMode: 'offlineFirst'` et un `gcTime` de 24 heures. Les données sont persistées sur le disque de l'appareil via `@tanstack/react-query-persist-client` et `AsyncStorage`. En cas de perte de réseau, l'application affiche les dernières données connues avec un bandeau « Mode hors ligne » plutôt qu'un écran d'erreur vide.
+
