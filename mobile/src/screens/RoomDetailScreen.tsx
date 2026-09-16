@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React from 'react';
 import {
   ActivityIndicator,
   ScrollView,
@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useQuery } from '@tanstack/react-query';
 import { fetchRoomHistory, type LatestMeasurement, type Room } from '../api';
 
 interface Props {
@@ -15,26 +16,12 @@ interface Props {
 }
 
 export function RoomDetailScreen({ room, onBack }: Props): React.ReactElement {
-  const [history, setHistory] = useState<LatestMeasurement[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data: history = [], isLoading, error } = useQuery({
+    queryKey: ['history', room.roomId],
+    queryFn: () => fetchRoomHistory(room.roomId),
+  });
 
-  const load = useCallback(async () => {
-    try {
-      setError(null);
-      const data = await fetchRoomHistory(room.roomId);
-      setHistory(data);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Erreur inconnue');
-    } finally {
-      setLoading(false);
-    }
-  }, [room.roomId]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
+  const offline = error !== null && history.length > 0;
   const m = room.latestMeasurement;
 
   return (
@@ -42,6 +29,12 @@ export function RoomDetailScreen({ room, onBack }: Props): React.ReactElement {
       <TouchableOpacity style={styles.backBtn} onPress={onBack}>
         <Text style={styles.backText}>← Retour</Text>
       </TouchableOpacity>
+
+      {offline && (
+        <View style={styles.offlineBanner}>
+          <Text style={styles.offlineText}>Mode hors ligne — dernières données connues</Text>
+        </View>
+      )}
 
       <Text style={styles.title}>{room.label}</Text>
       <Text style={styles.deviceId}>Capteur : {room.deviceId}</Text>
@@ -71,10 +64,15 @@ export function RoomDetailScreen({ room, onBack }: Props): React.ReactElement {
 
       <Text style={styles.sectionTitle}>Historique (50 dernières mesures)</Text>
 
-      {loading && <ActivityIndicator color="#4285F4" style={{ marginTop: 16 }} />}
-      {error && <Text style={styles.errorText}>{error}</Text>}
+      {isLoading && <ActivityIndicator color="#4285F4" style={{ marginTop: 16 }} />}
 
-      {!loading && !error && history.length === 0 && (
+      {error && history.length === 0 && (
+        <Text style={styles.errorText}>
+          {error instanceof Error ? error.message : 'Erreur inconnue'}
+        </Text>
+      )}
+
+      {!isLoading && history.length === 0 && !error && (
         <Text style={styles.emptyText}>Aucun historique disponible</Text>
       )}
 
@@ -108,6 +106,14 @@ const styles = StyleSheet.create({
   content: { padding: 16, paddingBottom: 32 },
   backBtn: { marginBottom: 16 },
   backText: { color: '#4285F4', fontSize: 16 },
+  offlineBanner: {
+    backgroundColor: '#f39c12',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  offlineText: { color: '#fff', fontSize: 12, fontWeight: '600', textAlign: 'center' },
   title: { fontSize: 24, fontWeight: '700', color: '#1a1a1a', marginBottom: 4 },
   deviceId: { fontSize: 13, color: '#888', marginBottom: 12 },
   statusBanner: { padding: 10, borderRadius: 8, marginBottom: 16 },
