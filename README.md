@@ -16,17 +16,23 @@ Le backend s'abonne aux topics MQTT du simulateur, stocke les mesures et expose 
 
 ## Lancer le projet
 
-**Prérequis :** Docker Desktop démarré (conteneurs Linux).
+### Prérequis
+
+- Docker Desktop démarré (conteneurs Linux)
+- Node.js 20+ et npm
+- [Expo Go](https://expo.dev/go) installé sur le téléphone (iOS ou Android), sur le même réseau Wi-Fi que la machine
+
+### 1. Backend et infrastructure
 
 ```sh
-# 1. Cloner le dépôt
+# Cloner le dépôt
 git clone <votre-repo>
 cd <votre-repo>
 
-# 2. Démarrer tout le système (Mosquitto + simulateur + backend)
+# Démarrer tout le système (Mosquitto + simulateur + PostgreSQL + backend)
 docker compose up -d --build --wait
 
-# 3. Vérifier que tout tourne
+# Vérifier que tout tourne
 docker compose ps
 ```
 
@@ -35,6 +41,29 @@ Les quatre services doivent être `running` :
 - `simulator` — produit des mesures toutes les 2 s
 - `postgres` — base de données sur le port **5432** (localhost uniquement)
 - `backend` — API REST sur le port **3000**
+
+### 2. Application mobile
+
+```sh
+cd mobile
+
+# Installer les dépendances
+npm install
+
+# Configurer l'adresse du backend
+# Copier le fichier d'exemple et renseigner l'IP locale de votre machine
+cp .env.local.example .env.local
+# Éditer .env.local :
+# EXPO_PUBLIC_API_URL=http://<IP-de-votre-machine>:3000
+# (trouver l'IP avec : ipconfig getifaddr en0  ou  ip route get 1 | awk '{print $7}')
+
+# Démarrer Expo
+npx expo start
+```
+
+Scanner le QR code affiché dans le terminal avec **Expo Go** sur le téléphone.
+
+> Le téléphone et la machine doivent être sur le **même réseau Wi-Fi**. L'IP `localhost` ne fonctionne pas depuis un appareil physique.
 
 ---
 
@@ -166,6 +195,13 @@ Le `message_id` est la clé primaire PostgreSQL. Un doublon QoS 1 ou un incident
 │   │   └── infrastructure/  ← MQTT, PostgreSQL, HTTP (Express)
 │   ├── Dockerfile
 │   └── package.json
+├── mobile/                  ← Application React Native (Expo)
+│   ├── src/
+│   │   ├── screens/         ← écrans (liste des salles, détail)
+│   │   ├── components/      ← composants réutilisables
+│   │   └── api.ts           ← client API REST
+│   ├── .env.local.example   ← modèle de configuration
+│   └── App.tsx
 ├── docs/
 │   ├── architecture.md      ← schéma et décisions d'architecture
 │   ├── J1.md                ← journal J1 avec preuves
