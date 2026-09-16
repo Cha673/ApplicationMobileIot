@@ -6,6 +6,11 @@ export interface MeasurementRepository {
   existsById(messageId: string): Promise<boolean>;
   findLatestByDevice(deviceId: string): Promise<Measurement | null>;
   findHistoryByDevice(deviceId: string, limit: number): Promise<Measurement[]>;
+  findAverageTemperatureByDevice(
+    deviceId: string,
+    from: string,
+    to: string,
+  ): Promise<number | null>;
 }
 
 export interface SyncableMeasurementRepository extends MeasurementRepository {

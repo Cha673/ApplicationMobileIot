@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 import {
   ActivityIndicator,
   ScrollView,
@@ -6,9 +6,16 @@ import {
   Text,
   TouchableOpacity,
   View,
-} from 'react-native';
-import { useQuery } from '@tanstack/react-query';
-import { fetchRoomHistory, type LatestMeasurement, type Room } from '../api';
+} from "react-native";
+import { useQuery } from "@tanstack/react-query";
+import {
+  fetchRoomHistory,
+  fetchYesterdayTemperatureAverage,
+  formatMeasurementTimestamp,
+  ROOM_HISTORY_LIMIT,
+  type LatestMeasurement,
+  type Room,
+} from "../api";
 
 interface Props {
   room: Room;
@@ -16,9 +23,17 @@ interface Props {
 }
 
 export function RoomDetailScreen({ room, onBack }: Props): React.ReactElement {
-  const { data: history = [], isLoading, error } = useQuery({
-    queryKey: ['history', room.roomId],
+  const {
+    data: history = [],
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey: ["history", room.roomId],
     queryFn: () => fetchRoomHistory(room.roomId),
+  });
+  const { data: yesterdayAverage, error: averageError } = useQuery({
+    queryKey: ["average-temperature-yesterday", room.roomId],
+    queryFn: () => fetchYesterdayTemperatureAverage(room.roomId),
   });
 
   const offline = error !== null && history.length > 0;
@@ -32,16 +47,24 @@ export function RoomDetailScreen({ room, onBack }: Props): React.ReactElement {
 
       {offline && (
         <View style={styles.offlineBanner}>
-          <Text style={styles.offlineText}>Mode hors ligne — dernières données connues</Text>
+          <Text style={styles.offlineText}>
+            Mode hors ligne — dernière donnée du{" "}
+            {m ? formatMeasurementTimestamp(m.observedAt) : "date inconnue"}
+          </Text>
         </View>
       )}
 
       <Text style={styles.title}>{room.label}</Text>
       <Text style={styles.deviceId}>Capteur : {room.deviceId}</Text>
 
-      <View style={[styles.statusBanner, room.isOnline ? styles.bannerOnline : styles.bannerOffline]}>
+      <View
+        style={[
+          styles.statusBanner,
+          room.isOnline ? styles.bannerOnline : styles.bannerOffline,
+        ]}
+      >
         <Text style={styles.statusText}>
-          {room.isOnline ? 'Capteur en ligne' : 'Capteur hors ligne'}
+          {room.isOnline ? "Capteur en ligne" : "Capteur hors ligne"}
         </Text>
       </View>
 
@@ -49,26 +72,58 @@ export function RoomDetailScreen({ room, onBack }: Props): React.ReactElement {
         <View style={styles.latest}>
           <Text style={styles.sectionTitle}>Dernière mesure</Text>
           <View style={styles.measures}>
-            <MeasureBlock value={`${m.temperature.toFixed(1)}`} unit="°C" label="Température" />
-            <MeasureBlock value={`${Math.round(m.co2)}`} unit="ppm" label="CO₂" />
+            <MeasureBlock
+              value={`${m.temperature.toFixed(1)}`}
+              unit="°C"
+              label="Température"
+            />
+            <MeasureBlock
+              value={`${Math.round(m.co2)}`}
+              unit="ppm"
+              label="CO₂"
+            />
           </View>
           <Text style={styles.observedAt}>
-            Relevée le {new Date(m.observedAt).toLocaleString('fr-FR')}
+            Donnée du {formatMeasurementTimestamp(m.observedAt)}
           </Text>
         </View>
       ) : (
         <View style={styles.noDataBox}>
-          <Text style={styles.noDataText}>Aucune mesure disponible pour cette salle</Text>
+          <Text style={styles.noDataText}>
+            Aucune mesure disponible pour cette salle
+          </Text>
         </View>
       )}
 
-      <Text style={styles.sectionTitle}>Historique (50 dernières mesures)</Text>
+      <View style={styles.averageBox}>
+        <Text style={styles.sectionTitle}>Moyenne de température d&apos;hier</Text>
+        {averageError ? (
+          <Text style={styles.errorText}>Moyenne indisponible</Text>
+        ) : yesterdayAverage?.averageTemperature !== null && yesterdayAverage ? (
+          <Text style={styles.averageValue}>
+            {yesterdayAverage.averageTemperature.toFixed(1)} °C
+          </Text>
+        ) : (
+          <Text style={styles.emptyText}>Aucune mesure hier</Text>
+        )}
+        {yesterdayAverage && (
+          <Text style={styles.averageDate}>
+            Journée du {new Date(`${yesterdayAverage.date}T00:00:00Z`).toLocaleDateString("fr-FR")}
+          </Text>
+        )}
+      </View>
 
-      {isLoading && <ActivityIndicator color="#4285F4" style={{ marginTop: 16 }} />}
+      <Text style={styles.sectionTitle}>
+        {ROOM_HISTORY_LIMIT} dernières valeurs mesurées
+      </Text>
+
+      {isLoading && (
+        <ActivityIndicator color="#4285F4" style={{ marginTop: 16 }} />
+      )}
 
       {error && history.length === 0 && (
         <Text style={styles.errorText}>
-          {error instanceof Error ? error.message : 'Erreur inconnue'}
+          {error instanceof Error ? error.message : "Erreur inconnue"}
         </Text>
       )}
 
@@ -79,9 +134,11 @@ export function RoomDetailScreen({ room, onBack }: Props): React.ReactElement {
       {history.map((entry, index) => (
         <View key={index} style={styles.historyRow}>
           <Text style={styles.historyTime}>
-            {new Date(entry.observedAt).toLocaleTimeString('fr-FR')}
+            {formatMeasurementTimestamp(entry.observedAt)}
           </Text>
-          <Text style={styles.historyValue}>{entry.temperature.toFixed(1)} °C</Text>
+          <Text style={styles.historyValue}>
+            {entry.temperature.toFixed(1)} °C
+          </Text>
           <Text style={styles.historyValue}>{Math.round(entry.co2)} ppm</Text>
         </View>
       ))}
@@ -89,7 +146,15 @@ export function RoomDetailScreen({ room, onBack }: Props): React.ReactElement {
   );
 }
 
-function MeasureBlock({ value, unit, label }: { value: string; unit: string; label: string }): React.ReactElement {
+function MeasureBlock({
+  value,
+  unit,
+  label,
+}: {
+  value: string;
+  unit: string;
+  label: string;
+}): React.ReactElement {
   return (
     <View style={styles.measureBlock}>
       <View style={styles.measureRow}>
@@ -102,46 +167,86 @@ function MeasureBlock({ value, unit, label }: { value: string; unit: string; lab
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f5f5' },
+  container: { flex: 1, backgroundColor: "#f5f5f5" },
   content: { padding: 16, paddingBottom: 32 },
   backBtn: { marginBottom: 16 },
-  backText: { color: '#4285F4', fontSize: 16 },
+  backText: { color: "#4285F4", fontSize: 16 },
   offlineBanner: {
-    backgroundColor: '#f39c12',
+    backgroundColor: "#f39c12",
     paddingVertical: 6,
     paddingHorizontal: 12,
     borderRadius: 8,
     marginBottom: 12,
   },
-  offlineText: { color: '#fff', fontSize: 12, fontWeight: '600', textAlign: 'center' },
-  title: { fontSize: 24, fontWeight: '700', color: '#1a1a1a', marginBottom: 4 },
-  deviceId: { fontSize: 13, color: '#888', marginBottom: 12 },
+  offlineText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "600",
+    textAlign: "center",
+  },
+  title: { fontSize: 24, fontWeight: "700", color: "#1a1a1a", marginBottom: 4 },
+  deviceId: { fontSize: 13, color: "#888", marginBottom: 12 },
   statusBanner: { padding: 10, borderRadius: 8, marginBottom: 16 },
-  bannerOnline: { backgroundColor: '#e8f5e9' },
-  bannerOffline: { backgroundColor: '#fde8e8' },
-  statusText: { textAlign: 'center', fontWeight: '500', color: '#444' },
-  latest: { backgroundColor: '#fff', borderRadius: 12, padding: 16, marginBottom: 16, elevation: 2 },
-  sectionTitle: { fontSize: 15, fontWeight: '600', color: '#555', marginBottom: 10 },
-  measures: { flexDirection: 'row', justifyContent: 'space-around', marginBottom: 8 },
-  measureBlock: { alignItems: 'center' },
-  measureRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 4 },
-  measureValue: { fontSize: 36, fontWeight: '700', color: '#1a1a1a' },
-  measureUnit: { fontSize: 16, color: '#666', marginBottom: 6 },
-  measureLabel: { fontSize: 13, color: '#888' },
-  observedAt: { fontSize: 12, color: '#aaa', textAlign: 'center', marginTop: 4 },
-  noDataBox: { backgroundColor: '#fff', borderRadius: 12, padding: 20, marginBottom: 16, alignItems: 'center' },
-  noDataText: { color: '#bbb', fontStyle: 'italic' },
-  errorText: { color: '#c0392b', marginTop: 8 },
-  emptyText: { color: '#aaa', fontStyle: 'italic', marginTop: 8 },
+  bannerOnline: { backgroundColor: "#e8f5e9" },
+  bannerOffline: { backgroundColor: "#fde8e8" },
+  statusText: { textAlign: "center", fontWeight: "500", color: "#444" },
+  latest: {
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    elevation: 2,
+  },
+  sectionTitle: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#555",
+    marginBottom: 10,
+  },
+  measures: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    marginBottom: 8,
+  },
+  measureBlock: { alignItems: "center" },
+  measureRow: { flexDirection: "row", alignItems: "flex-end", gap: 4 },
+  measureValue: { fontSize: 36, fontWeight: "700", color: "#1a1a1a" },
+  measureUnit: { fontSize: 16, color: "#666", marginBottom: 6 },
+  measureLabel: { fontSize: 13, color: "#888" },
+  observedAt: {
+    fontSize: 12,
+    color: "#aaa",
+    textAlign: "center",
+    marginTop: 4,
+  },
+  noDataBox: {
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 16,
+    alignItems: "center",
+  },
+  noDataText: { color: "#bbb", fontStyle: "italic" },
+  averageBox: {
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    elevation: 2,
+  },
+  averageValue: { fontSize: 28, fontWeight: "700", color: "#1a1a1a" },
+  averageDate: { fontSize: 12, color: "#aaa", marginTop: 4 },
+  errorText: { color: "#c0392b", marginTop: 8 },
+  emptyText: { color: "#aaa", fontStyle: "italic", marginTop: 8 },
   historyRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    backgroundColor: '#fff',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    backgroundColor: "#fff",
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 8,
     marginBottom: 4,
   },
-  historyTime: { color: '#666', fontSize: 13 },
-  historyValue: { color: '#1a1a1a', fontSize: 13, fontWeight: '500' },
+  historyTime: { color: "#666", fontSize: 13 },
+  historyValue: { color: "#1a1a1a", fontSize: 13, fontWeight: "500" },
 });
