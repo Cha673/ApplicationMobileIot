@@ -6,6 +6,8 @@ import {
   PgMeasurementRepository,
   PgDeviceRepository,
 } from './infrastructure/database';
+import { createMongoClient, initMongo, MongoMeasurementRepository } from './infrastructure/mongo';
+import { FallbackMeasurementRepository } from './infrastructure/fallback';
 import { connectMqtt } from './infrastructure/mqtt';
 import { createHttpServer } from './infrastructure/http';
 import { TelemetryService } from './application/telemetryService';
@@ -16,6 +18,7 @@ const MQTT_USER = process.env['MQTT_USER'] ?? 'backend';
 const MQTT_PASSWORD = process.env['MQTT_PASSWORD'] ?? 'backend-demo';
 const API_PORT = parseInt(process.env['API_PORT'] ?? '3000', 10);
 const DEVICES_PATH = process.env['DEVICES_PATH'] ?? path.join(process.cwd(), 'devices.json');
+const SYNC_INTERVAL_MS = parseInt(process.env['SYNC_INTERVAL_MS'] ?? '5000', 10);
 
 interface DeviceConfig {
   device_id: string;
@@ -37,19 +40,32 @@ async function seedDevices(repo: PgDeviceRepository): Promise<void> {
 }
 
 async function main(): Promise<void> {
+  // Relational DB (PostgreSQL) — source of truth for validated reads
   const pool = createPool();
   await runMigrations(pool);
-
-  const measurementRepo = new PgMeasurementRepository(pool);
+  const pgMeasurements = new PgMeasurementRepository(pool);
   const deviceRepo = new PgDeviceRepository(pool);
+
+  // Non-relational DB (MongoDB) — raw ingest and offline cache
+  const mongoClient = createMongoClient();
+  await mongoClient.connect();
+  const mongoDB = await initMongo(mongoClient);
+  const mongoMeasurements = new MongoMeasurementRepository(mongoDB);
+  console.log('[init] connected to mongodb');
+
+  // Reads use PostgreSQL with automatic fallback to MongoDB when PG is unavailable
+  const readMeasurements = new FallbackMeasurementRepository(pgMeasurements, mongoMeasurements);
 
   await seedDevices(deviceRepo);
 
-  const service = new TelemetryService(measurementRepo, deviceRepo);
+  // Write path: mongo first, then sync to postgres
+  const service = new TelemetryService(mongoMeasurements, pgMeasurements, deviceRepo);
+
+  service.startSyncLoop(SYNC_INTERVAL_MS);
 
   connectMqtt(MQTT_HOST, MQTT_PORT, MQTT_USER, MQTT_PASSWORD, service);
 
-  const app = createHttpServer(deviceRepo, measurementRepo);
+  const app = createHttpServer(deviceRepo, readMeasurements);
   app.listen(API_PORT, '0.0.0.0', () => {
     console.log(`[http] API listening on port ${API_PORT}`);
   });

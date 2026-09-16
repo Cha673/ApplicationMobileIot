@@ -57,6 +57,22 @@ export class PgMeasurementRepository implements MeasurementRepository {
     );
   }
 
+  async saveBatch(batch: Measurement[]): Promise<void> {
+    if (batch.length === 0) return;
+    const values: unknown[] = [];
+    const placeholders = batch.map((m, i) => {
+      const b = i * 7;
+      values.push(m.messageId, m.deviceId, m.roomId, m.observedAt, m.receivedAt, m.temperature, m.co2);
+      return `($${b + 1},$${b + 2},$${b + 3},$${b + 4},$${b + 5},$${b + 6},$${b + 7})`;
+    });
+    await this.pool.query(
+      `INSERT INTO measurements (message_id, device_id, room_id, observed_at, received_at, temperature, co2)
+       VALUES ${placeholders.join(',')}
+       ON CONFLICT (message_id) DO NOTHING`,
+      values,
+    );
+  }
+
   async existsById(messageId: string): Promise<boolean> {
     const result = await this.pool.query(
       "SELECT 1 FROM measurements WHERE message_id = $1",
