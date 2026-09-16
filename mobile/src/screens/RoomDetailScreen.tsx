@@ -8,7 +8,7 @@ import {
   View,
 } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
-import { fetchRoomHistory, type LatestMeasurement, type Room } from '../api';
+import { fetchRooms, fetchRoomHistory, type LatestMeasurement, type Room } from '../api';
 
 interface Props {
   room: Room;
@@ -16,19 +16,45 @@ interface Props {
 }
 
 export function RoomDetailScreen({ room, onBack }: Props): React.ReactElement {
-  const { data: history = [], isLoading, error } = useQuery({
+  const { data: rooms = [], isFetching: isRoomFetching, error: roomsError } = useQuery({
+    queryKey: ['rooms'],
+    queryFn: fetchRooms,
+    refetchInterval: 5000,
+  });
+  const liveRoom = rooms.find(r => r.roomId === room.roomId) ?? room;
+
+  const { data: history = [], isLoading, error, isFetching: isHistoryFetching } = useQuery({
     queryKey: ['history', room.roomId],
     queryFn: () => fetchRoomHistory(room.roomId),
+    refetchInterval: 10000,
   });
 
+  const appOffline = roomsError !== null && rooms.length > 0;
+  const isOnline = !appOffline && liveRoom.isOnline;
+  const isUpdating = (isRoomFetching || isHistoryFetching) && !isLoading;
   const offline = error !== null && history.length > 0;
-  const m = room.latestMeasurement;
+  const m = liveRoom.latestMeasurement;
+
+  const avgTemp = history.length > 0
+    ? history.reduce((sum, e) => sum + e.temperature, 0) / history.length
+    : null;
+  const avgCo2 = history.length > 0
+    ? history.reduce((sum, e) => sum + e.co2, 0) / history.length
+    : null;
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <TouchableOpacity style={styles.backBtn} onPress={onBack}>
-        <Text style={styles.backText}>← Retour</Text>
-      </TouchableOpacity>
+      <View style={styles.topRow}>
+        <TouchableOpacity style={styles.backBtn} onPress={onBack}>
+          <Text style={styles.backText}>← Retour</Text>
+        </TouchableOpacity>
+        {isUpdating && (
+          <View style={styles.updatingRow}>
+            <ActivityIndicator size="small" color="#4285F4" />
+            <Text style={styles.updatingText}>Actualisation…</Text>
+          </View>
+        )}
+      </View>
 
       {offline && (
         <View style={styles.offlineBanner}>
@@ -39,9 +65,9 @@ export function RoomDetailScreen({ room, onBack }: Props): React.ReactElement {
       <Text style={styles.title}>{room.label}</Text>
       <Text style={styles.deviceId}>Capteur : {room.deviceId}</Text>
 
-      <View style={[styles.statusBanner, room.isOnline ? styles.bannerOnline : styles.bannerOffline]}>
+      <View style={[styles.statusBanner, isOnline ? styles.bannerOnline : styles.bannerOffline]}>
         <Text style={styles.statusText}>
-          {room.isOnline ? 'Capteur en ligne' : 'Capteur hors ligne'}
+          {isOnline ? 'Capteur en ligne' : 'Capteur hors ligne'}
         </Text>
       </View>
 
@@ -62,14 +88,31 @@ export function RoomDetailScreen({ room, onBack }: Props): React.ReactElement {
         </View>
       )}
 
+      {avgTemp !== null && avgCo2 !== null && (
+        <View style={styles.latest}>
+          <Text style={styles.sectionTitle}>Moyenne ({history.length} dernières mesures)</Text>
+          <View style={styles.measures}>
+            <MeasureBlock value={avgTemp.toFixed(1)} unit="°C" label="Température moy." />
+            <MeasureBlock value={`${Math.round(avgCo2)}`} unit="ppm" label="CO₂ moy." />
+          </View>
+        </View>
+      )}
+
       <Text style={styles.sectionTitle}>Historique (50 dernières mesures)</Text>
 
       {isLoading && <ActivityIndicator color="#4285F4" style={{ marginTop: 16 }} />}
 
       {error && history.length === 0 && (
-        <Text style={styles.errorText}>
-          {error instanceof Error ? error.message : 'Erreur inconnue'}
-        </Text>
+        <View style={styles.errorBox}>
+          <Text style={styles.errorBoxTitle}>Historique non disponible hors ligne</Text>
+          <Text style={styles.errorBoxBody}>
+            Cet historique n'a jamais été téléchargé et ne se trouve pas dans le cache.
+            Ouvrez cette salle une fois connecté à Internet pour le mettre en cache.
+          </Text>
+          <Text style={styles.errorBoxDetail}>
+            {error instanceof Error ? error.message : 'Erreur inconnue'}
+          </Text>
+        </View>
       )}
 
       {!isLoading && history.length === 0 && !error && (
@@ -104,8 +147,11 @@ function MeasureBlock({ value, unit, label }: { value: string; unit: string; lab
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f5f5f5' },
   content: { padding: 16, paddingBottom: 32 },
-  backBtn: { marginBottom: 16 },
+  topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  backBtn: {},
   backText: { color: '#4285F4', fontSize: 16 },
+  updatingRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  updatingText: { fontSize: 12, color: '#4285F4' },
   offlineBanner: {
     backgroundColor: '#f39c12',
     paddingVertical: 6,
@@ -131,7 +177,17 @@ const styles = StyleSheet.create({
   observedAt: { fontSize: 12, color: '#aaa', textAlign: 'center', marginTop: 4 },
   noDataBox: { backgroundColor: '#fff', borderRadius: 12, padding: 20, marginBottom: 16, alignItems: 'center' },
   noDataText: { color: '#bbb', fontStyle: 'italic' },
-  errorText: { color: '#c0392b', marginTop: 8 },
+  errorBox: {
+    backgroundColor: '#fde8e8',
+    borderRadius: 10,
+    padding: 16,
+    marginTop: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: '#c0392b',
+  },
+  errorBoxTitle: { fontSize: 14, fontWeight: '700', color: '#c0392b', marginBottom: 6 },
+  errorBoxBody: { fontSize: 13, color: '#555', lineHeight: 19, marginBottom: 8 },
+  errorBoxDetail: { fontSize: 11, color: '#999', fontStyle: 'italic' },
   emptyText: { color: '#aaa', fontStyle: 'italic', marginTop: 8 },
   historyRow: {
     flexDirection: 'row',
