@@ -37,3 +37,8 @@
 │ Application mobile │
 │ React Native │
 └──────────────────────────┘
+
+# Architecture J2 — Des données auxquelles on peut se fier
+
+Schéma de notre nouvelle architecture
+![Schéma de notre architecture](images/architecture_J2.png)
