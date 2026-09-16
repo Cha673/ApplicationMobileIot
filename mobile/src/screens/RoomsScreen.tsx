@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchRooms, type Room } from '../api';
 
 interface Props {
@@ -15,36 +16,21 @@ interface Props {
 }
 
 export function RoomsScreen({ onSelectRoom }: Props): React.ReactElement {
-  const [rooms, setRooms] = useState<Room[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
+  const queryClient = useQueryClient();
 
-  const load = useCallback(async () => {
-    try {
-      setError(null);
-      const data = await fetchRooms();
-      setRooms(data);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Erreur inconnue');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, []);
+  const { data: rooms = [], isLoading, error, isRefetching } = useQuery({
+    queryKey: ['rooms'],
+    queryFn: fetchRooms,
+    refetchInterval: 5000,
+  });
 
-  useEffect(() => {
-    void load();
-    const interval = setInterval(() => { void load(); }, 5000);
-    return () => clearInterval(interval);
-  }, [load]);
+  const offline = error !== null && rooms.length > 0;
 
   const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    void load();
-  }, [load]);
+    void queryClient.invalidateQueries({ queryKey: ['rooms'] });
+  }, [queryClient]);
 
-  if (loading) {
+  if (isLoading) {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" color="#4285F4" />
@@ -53,13 +39,18 @@ export function RoomsScreen({ onSelectRoom }: Props): React.ReactElement {
     );
   }
 
-  if (error) {
+  if (error && rooms.length === 0) {
     return (
       <View style={styles.center}>
         <Text style={styles.errorIcon}>⚠️</Text>
         <Text style={styles.errorTitle}>Impossible de joindre le backend</Text>
-        <Text style={styles.errorDetail}>{error}</Text>
-        <TouchableOpacity style={styles.retryButton} onPress={() => { setLoading(true); void load(); }}>
+        <Text style={styles.errorDetail}>
+          {error instanceof Error ? error.message : 'Erreur inconnue'}
+        </Text>
+        <TouchableOpacity
+          style={styles.retryButton}
+          onPress={() => void queryClient.invalidateQueries({ queryKey: ['rooms'] })}
+        >
           <Text style={styles.retryText}>Réessayer</Text>
         </TouchableOpacity>
       </View>
@@ -75,17 +66,24 @@ export function RoomsScreen({ onSelectRoom }: Props): React.ReactElement {
   }
 
   return (
-    <FlatList
-      data={rooms}
-      keyExtractor={(item) => item.roomId}
-      renderItem={({ item }) => (
-        <TouchableOpacity onPress={() => onSelectRoom(item)} activeOpacity={0.8}>
-          <RoomRow room={item} />
-        </TouchableOpacity>
+    <View style={styles.container}>
+      {offline && (
+        <View style={styles.offlineBanner}>
+          <Text style={styles.offlineText}>Mode hors ligne — dernières données connues</Text>
+        </View>
       )}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-      contentContainerStyle={styles.list}
-    />
+      <FlatList
+        data={rooms}
+        keyExtractor={(item) => item.roomId}
+        renderItem={({ item }) => (
+          <TouchableOpacity onPress={() => onSelectRoom(item)} activeOpacity={0.8}>
+            <RoomRow room={item} />
+          </TouchableOpacity>
+        )}
+        refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={onRefresh} />}
+        contentContainerStyle={styles.list}
+      />
+    </View>
   );
 }
 
@@ -127,6 +125,7 @@ function Measure({ value, label }: { value: string; label: string }): React.Reac
 }
 
 const styles = StyleSheet.create({
+  container: { flex: 1 },
   list: { paddingVertical: 8 },
   center: {
     flex: 1,
@@ -135,6 +134,12 @@ const styles = StyleSheet.create({
     padding: 24,
     gap: 12,
   },
+  offlineBanner: {
+    backgroundColor: '#f39c12',
+    paddingVertical: 6,
+    paddingHorizontal: 16,
+  },
+  offlineText: { color: '#fff', fontSize: 12, fontWeight: '600', textAlign: 'center' },
   loadingText: { color: '#555', marginTop: 12 },
   errorIcon: { fontSize: 40 },
   errorTitle: { fontSize: 16, fontWeight: '600', color: '#c0392b', textAlign: 'center' },
