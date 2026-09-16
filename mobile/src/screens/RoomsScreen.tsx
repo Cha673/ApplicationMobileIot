@@ -77,7 +77,7 @@ export function RoomsScreen({ onSelectRoom }: Props): React.ReactElement {
         keyExtractor={(item) => item.roomId}
         renderItem={({ item }) => (
           <TouchableOpacity onPress={() => onSelectRoom(item)} activeOpacity={0.8}>
-            <RoomRow room={item} />
+            <RoomRow room={item} appOffline={offline} />
           </TouchableOpacity>
         )}
         refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={onRefresh} />}
@@ -87,14 +87,15 @@ export function RoomsScreen({ onSelectRoom }: Props): React.ReactElement {
   );
 }
 
-function RoomRow({ room }: { room: Room }): React.ReactElement {
+function RoomRow({ room, appOffline }: { room: Room; appOffline: boolean }): React.ReactElement {
   const m = room.latestMeasurement;
+  const isOnline = !appOffline && room.isOnline;
   return (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
         <Text style={styles.roomLabel}>{room.label}</Text>
-        <View style={[styles.badge, room.isOnline ? styles.online : styles.offline]}>
-          <Text style={styles.badgeText}>{room.isOnline ? 'En ligne' : 'Hors ligne'}</Text>
+        <View style={[styles.badge, isOnline ? styles.online : styles.offline]}>
+          <Text style={styles.badgeText}>{isOnline ? 'En ligne' : 'Hors ligne'}</Text>
         </View>
       </View>
       {m ? (
