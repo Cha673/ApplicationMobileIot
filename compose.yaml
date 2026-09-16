@@ -1,4 +1,17 @@
 services:
+  mongodb:
+    image: mongo:7
+    ports:
+      - "127.0.0.1:${MONGO_PORT:-27017}:27017"
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 4s
+      retries: 12
+    restart: unless-stopped
+
   postgres:
     image: postgres:16-alpine
     environment:
@@ -27,6 +40,8 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-campus}
       POSTGRES_USER: ${POSTGRES_USER:-campus}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-campus-demo}
+      MONGO_URI: mongodb://mongodb:27017/campus
+      SYNC_INTERVAL_MS: ${SYNC_INTERVAL_MS:-5000}
       DEVICES_PATH: /app/devices.json
     volumes:
       - ./devices.json:/app/devices.json:ro
@@ -36,6 +51,8 @@ services:
       mosquitto:
         condition: service_healthy
       postgres:
+        condition: service_healthy
+      mongodb:
         condition: service_healthy
     restart: unless-stopped
 
@@ -150,3 +167,5 @@ services:
 volumes:
   broker-data:
   postgres-data:
+  mongo-data:
+

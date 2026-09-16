@@ -2,9 +2,15 @@ import type { Measurement, Device } from './types';
 
 export interface MeasurementRepository {
   save(measurement: Measurement): Promise<void>;
+  saveBatch(measurements: Measurement[]): Promise<void>;
   existsById(messageId: string): Promise<boolean>;
   findLatestByDevice(deviceId: string): Promise<Measurement | null>;
   findHistoryByDevice(deviceId: string, limit: number): Promise<Measurement[]>;
+}
+
+export interface SyncableMeasurementRepository extends MeasurementRepository {
+  findUnsynced(limit: number): Promise<Measurement[]>;
+  markSyncedBatch(messageIds: string[]): Promise<void>;
 }
 
 export interface DeviceRepository {
