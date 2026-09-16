@@ -2,12 +2,24 @@
 
 ## Décisions prises J2
 
-On a choisi de doubler notre base de données pour améliorer la scalabilité et les performances de l'application en cas de gros volume de données, et vérifier que les données sont correctes.
-Nous avons ajouté une base de données non relationnelle : **MongoDB**, qui stocke l'ensemble des messages reçus par Mosquitto et MQTT depuis le simulateur. Ensuite, nous avons gardé une base de données relationnelle **PostgreSQL** qui ne contient que des données vérifiées et sans doublons grâce au backend qui vérifie si l'ID du message est déjà présent dans notre base PostgreSQL. Cette base stocke également les données calculées.
+### Double base de données : MongoDB + PostgreSQL
 
-La synchronisation des données entre les deux bases se fait par lots toutes les 5 secondes. Cela permet de limiter les appels réseau, les ralentissements ou les crashs de notre base de données principale.
+On a choisi de doubler notre base de données. Nous avons ajouté une base de données non relationnelle : **MongoDB 7**, qui reçoit l'ensemble des messages de télémétrie dès leur arrivée via MQTT. Ensuite, nous avons conservé **PostgreSQL 16** comme source de vérité pour les lectures : elle ne contient que des données validées et sans doublons métier.
 
-Nous avons décidé d'utiliser TanStack, une librairie qui nous permet de ne pas recréer le cache manuellement.
-Ce cache nous sert lorsque notre application mobile perd la connexion. L'application sans connexion utilise alors les données mises en cache. Dans ce cache, nous avons les dernières données sauvegardées. Pour l'historique des données ainsi que la moyenne des données sur un laps de temps, ces données sont affichées hors ligne seulement si elles ont été consultées et chargées auparavant.
+**Chemin d'écriture :**
+1. Le message est validé (champs obligatoires, types numériques).
+2. La déduplication est effectuée dans MongoDB via un index unique sur `message_id` et l'opération `$setOnInsert` : un message rejoué n'est jamais inséré deux fois.
+3. Le message est sauvegardé dans MongoDB avec le flag `synced: false`.
+4. Un lot de synchronisation (maximum 500 messages, toutes les 5 secondes) transfère les messages non synchronisés de MongoDB vers PostgreSQL. L'insertion dans PostgreSQL utilise `ON CONFLICT (message_id) DO NOTHING` comme filet de sécurité supplémentaire.
 
-L'application recharge les données toutes les 5 secondes pour les dernières données des salles, et met à jour l'historique toutes les 10 secondes.
+**Chemin de lecture :**
+L'API expose un `FallbackMeasurementRepository` : les requêtes lisent PostgreSQL en priorité. Si PostgreSQL est indisponible, la lecture bascule automatiquement sur MongoDB. Cela garantit la disponibilité de l'API même en cas de panne de la base principale.
+
+**Pourquoi ce découplage ?**
+- Limiter les appels réseau directs vers PostgreSQL lors des pics d'ingestion.
+- Éviter qu'une indisponibilité de PostgreSQL ne bloque la réception des mesures.
+- Disposer d'un journal complet de tous les messages bruts dans MongoDB, y compris les doublons rejetés.
+
+### Cache persistant côté mobile
+
+TanStack Query v5 est configuré avec `networkMode: 'offlineFirst'` et un `gcTime` de 24 heures. Les données sont persistées sur le disque de l'appareil via `@tanstack/react-query-persist-client` et `AsyncStorage`. En cas de perte de réseau, l'application affiche les dernières données connues avec un bandeau « Mode hors ligne » plutôt qu'un écran d'erreur vide.
