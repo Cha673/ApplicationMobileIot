@@ -14,7 +14,7 @@ import paho.mqtt.client as mqtt
 from simulator.model import Device, now
 
 LOG = logging.getLogger('simulator')
-ACTIONS = ['pause', 'resume', 'duplicate', 'delay', 'invalid', 'high-co2', 'normal-co2', 'no-response', 'respond', 'reset']
+ACTIONS = ['pause', 'resume', 'duplicate', 'delay', 'invalid', 'high-co2', 'normal-co2', 'no-response', 'respond', 'reset', 'volume']
 
 
 class Sensor:
@@ -32,7 +32,7 @@ class Sensor:
         # L'heure du Will est inconnue lors de sa préparation : ne pas inventer un horodatage de panne.
         self.client.will_set(self.base+'availability', json.dumps({'schema_version': 1, 'device_id': self.device.device_id, 'status': 'offline', 'reason': 'connection_lost'}), qos=1, retain=True)
         self.client.reconnect_delay_set(1, 8)
-        self.client.max_queued_messages_set(100)
+        self.client.max_queued_messages_set(0)  # unlimited — volume bursts must not drop messages
         self.client.on_connect = self.on_connect
         self.client.on_disconnect = lambda *args: self.online.clear()
         self.client.on_message = self.on_message
@@ -106,6 +106,21 @@ class Sensor:
             self.device.co2 = 650
             self.device.ventilation = False
             self.publish('state', self.device.state(), True)
+        elif action == 'volume':
+            count = value.get('count', 50) if isinstance(value, dict) else 50
+            duplicates = value.get('duplicates', 0) if isinstance(value, dict) else 0
+            if not isinstance(count, int) or not (1 <= count <= 1000):
+                status = 'rejected'
+            elif not isinstance(duplicates, int) or not (0 <= duplicates <= count):
+                status = 'rejected'
+            else:
+                sent = []
+                for _ in range(count):
+                    msg = self.device.measure()
+                    sent.append(json.loads(json.dumps(msg)))
+                    self.publish('telemetry', msg)
+                for i in range(duplicates):
+                    self.publish('telemetry', sent[i % len(sent)])
         else:
             measure = self.last or self.device.measure()
             measure = json.loads(json.dumps(measure))
