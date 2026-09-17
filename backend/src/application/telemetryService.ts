@@ -13,8 +13,8 @@ export class TelemetryService {
     private readonly events: EventRepository,
   ) {}
 
-  async processTelemetry(raw: unknown, topic: string): Promise<void> {
-    const result = parseTelemetry(raw, topic);
+  async processTelemetry(raw: unknown, topic: string, eventId: string): Promise<void> {
+    const result = parseTelemetry(raw, topic, eventId);
 
     if (!result.ok) {
       logger.warn('telemetry.rejected', { ...result.rejection, status: 'rejected' });
@@ -70,9 +70,9 @@ export class TelemetryService {
     try {
       await this.measurements.saveBatch(batch);
       await this.rawMeasurements.markSyncedBatch(batch.map((m) => m.messageId));
-      logger.info('sync.batch_ok', { count: batch.length });
+      logger.info('sync.batch_ok', { count: batch.length, eventIds: batch.map((m) => m.messageId) });
     } catch (err) {
-      logger.warn('sync.batch_failed', { count: batch.length, error: String(err) });
+      logger.warn('sync.batch_failed', { count: batch.length, eventIds: batch.map((m) => m.messageId), error: String(err) });
     }
   }
 }
@@ -107,11 +107,11 @@ function zodReasonFor(path: (string | number)[]): string {
   }
 }
 
-function parseTelemetry(raw: unknown, topic: string): ParseResult {
+function parseTelemetry(raw: unknown, topic: string, eventId: string): ParseResult {
   const result = TelemetrySchema.safeParse(raw);
   if (!result.success) {
     const issue = result.error.issues[0];
-    return { ok: false, rejection: { topic, reason: zodReasonFor(issue.path) } };
+    return { ok: false, rejection: { topic, eventId, reason: zodReasonFor(issue.path) } };
   }
 
   const { message_id, device_id, room_id, observed_at, temperature, co2 } = result.data;
@@ -122,7 +122,7 @@ function parseTelemetry(raw: unknown, topic: string): ParseResult {
     return {
       ok: false,
       rejection: {
-        topic, deviceId: device_id, eventId: message_id,
+        topic, deviceId: device_id, eventId,
         reason: 'value_out_of_range', field: 'temperature',
         value: tempVal, min: TEMP_MIN, max: TEMP_MAX,
       },
@@ -132,7 +132,7 @@ function parseTelemetry(raw: unknown, topic: string): ParseResult {
     return {
       ok: false,
       rejection: {
-        topic, deviceId: device_id, eventId: message_id,
+        topic, deviceId: device_id, eventId,
         reason: 'value_out_of_range', field: 'co2',
         value: co2Val, min: CO2_MIN, max: CO2_MAX,
       },
