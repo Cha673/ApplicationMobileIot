@@ -181,7 +181,7 @@ export class PgEventRepository implements EventRepository {
     await this.pool.query(
       `INSERT INTO rejected_events (topic, device_id, message_id, reason, field, value, min_val, max_val)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-      [e.topic, e.deviceId ?? null, e.messageId ?? null, e.reason,
+      [e.topic, e.deviceId ?? null, e.eventId ?? null, e.reason,
        e.field ?? null, e.value ?? null, e.min ?? null, e.max ?? null],
     );
   }

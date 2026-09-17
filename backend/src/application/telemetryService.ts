@@ -51,9 +51,9 @@ export class TelemetryService {
     });
   }
 
-  async processAvailability(deviceId: string, status: 'online' | 'offline'): Promise<void> {
+  async processAvailability(deviceId: string, status: 'online' | 'offline', topic: string): Promise<void> {
     await this.devices.updateStatus(deviceId, status === 'online', new Date().toISOString());
-    logger.info('availability.updated', { deviceId, status });
+    logger.info('availability.updated', { topic, deviceId, status });
   }
 
   startSyncLoop(intervalMs: number): void {
@@ -122,7 +122,7 @@ function parseTelemetry(raw: unknown, topic: string): ParseResult {
     return {
       ok: false,
       rejection: {
-        topic, deviceId: device_id, messageId: message_id,
+        topic, deviceId: device_id, eventId: message_id,
         reason: 'value_out_of_range', field: 'temperature',
         value: tempVal, min: TEMP_MIN, max: TEMP_MAX,
       },
@@ -132,7 +132,7 @@ function parseTelemetry(raw: unknown, topic: string): ParseResult {
     return {
       ok: false,
       rejection: {
-        topic, deviceId: device_id, messageId: message_id,
+        topic, deviceId: device_id, eventId: message_id,
         reason: 'value_out_of_range', field: 'co2',
         value: co2Val, min: CO2_MIN, max: CO2_MAX,
       },

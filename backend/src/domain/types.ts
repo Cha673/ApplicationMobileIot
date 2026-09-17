@@ -20,7 +20,7 @@ export interface Device {
 export interface RejectedEvent {
   topic: string;
   deviceId?: string;
-  messageId?: string;
+  eventId?: string;
   reason: string;
   field?: string;
   value?: number;
