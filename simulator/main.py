@@ -6,6 +6,7 @@ import os
 import queue
 import re
 import signal
+import sys
 import threading
 import time
 import uuid
@@ -15,6 +16,32 @@ from simulator.model import Device, now
 
 LOG = logging.getLogger('simulator')
 ACTIONS = ['pause', 'resume', 'duplicate', 'delay', 'invalid', 'high-co2', 'normal-co2', 'no-response', 'respond', 'reset', 'volume']
+
+
+class JsonFormatter(logging.Formatter):
+    """Émet une ligne JSON par enregistrement de log."""
+
+    _STDLIB = frozenset({
+        'name', 'msg', 'args', 'created', 'filename', 'funcName', 'levelname',
+        'levelno', 'lineno', 'module', 'msecs', 'message', 'pathname', 'process',
+        'processName', 'relativeCreated', 'stack_info', 'thread', 'threadName',
+        'exc_info', 'exc_text', 'taskName',
+    })
+
+    def format(self, record: logging.LogRecord) -> str:
+        entry: dict = {
+            'timestamp': datetime.fromtimestamp(record.created, tz=timezone.utc)
+                         .isoformat(timespec='milliseconds').replace('+00:00', 'Z'),
+            'service': 'simulator',
+            'level': record.levelname.lower(),
+            'event': record.getMessage(),
+        }
+        for k, v in record.__dict__.items():
+            if k not in self._STDLIB and not k.startswith('_'):
+                entry[k] = v
+        if record.exc_info:
+            entry['exc'] = self.formatException(record.exc_info)
+        return json.dumps(entry, ensure_ascii=False)
 
 
 class Sensor:
@@ -34,36 +61,67 @@ class Sensor:
         self.client.reconnect_delay_set(1, 8)
         self.client.max_queued_messages_set(0)  # unlimited — volume bursts must not drop messages
         self.client.on_connect = self.on_connect
-        self.client.on_disconnect = lambda *args: self.online.clear()
+        self.client.on_disconnect = self._on_disconnect
         self.client.on_message = self.on_message
 
     def publish(self, suffix, value, retain=False, topic=None):
         info = self.client.publish(topic or self.base+suffix, json.dumps(value, ensure_ascii=False), qos=1, retain=retain)
         if info.rc != mqtt.MQTT_ERR_SUCCESS:
-            LOG.warning('%s publication non remise : %s', self.device.device_id, info.rc)
+            LOG.warning('sensor.publish_failed', extra={
+                'deviceId': self.device.device_id,
+                'eventType': 'sensor.publish_failed',
+                'topic': topic or self.base + suffix,
+                'status': str(info.rc),
+            })
         return info
 
     def on_connect(self, client, userdata, flags, rc, properties):
         if rc.is_failure:
-            LOG.error('%s connexion refusée : %s', self.device.device_id, rc)
+            LOG.error('sensor.connection_refused', extra={
+                'deviceId': self.device.device_id,
+                'eventType': 'sensor.connection_refused',
+                'reason': str(rc),
+            })
             return
         client.subscribe([(self.base+'commands', 1), (self.control_topic, 1)])
         self.publish('availability', {'schema_version': 1, 'device_id': self.device.device_id, 'status': 'online', 'reported_at': now()}, True)
         self.publish('state', self.device.state(), True)
         self.online.set()
-        LOG.info('%s connecté', self.device.device_id)
+        LOG.info('sensor.connected', extra={
+            'deviceId': self.device.device_id,
+            'eventType': 'sensor.connected',
+        })
+
+    def _on_disconnect(self, *args):
+        self.online.clear()
+        LOG.warning('sensor.disconnected', extra={
+            'deviceId': self.device.device_id,
+            'eventType': 'sensor.disconnected',
+        })
 
     def on_message(self, client, userdata, message):
         if message.retain:
-            LOG.warning('%s message retained ignoré sur %s', self.device.device_id, message.topic)
+            LOG.warning('sensor.retained_ignored', extra={
+                'deviceId': self.device.device_id,
+                'eventType': 'sensor.retained_ignored',
+                'topic': message.topic,
+            })
             return
         if len(message.payload) > 4096:
-            LOG.warning('%s message trop volumineux ignoré', self.device.device_id)
+            LOG.warning('sensor.message_too_large', extra={
+                'deviceId': self.device.device_id,
+                'eventType': 'sensor.message_too_large',
+                'topic': message.topic,
+            })
             return
         try:
             self.inbox.put_nowait((message.topic, json.loads(message.payload)))
         except (ValueError, UnicodeDecodeError, queue.Full):
-            LOG.warning('%s message JSON invalide ou file pleine', self.device.device_id)
+            LOG.warning('sensor.message_invalid', extra={
+                'deviceId': self.device.device_id,
+                'eventType': 'sensor.message_invalid',
+                'topic': message.topic,
+            })
 
     def process(self):
         # Travail borné pour que les commandes ne bloquent pas la production des autres objets.
@@ -131,12 +189,26 @@ class Sensor:
                 measure['message_id'] = 'invalid-'+uuid.uuid4().hex
                 measure['co2']['value'] = 'invalide'
             self.publish('telemetry', measure)
+
+        LOG.info('sensor.control_handled', extra={
+            'deviceId': self.device.device_id,
+            'eventType': 'sensor.control_handled',
+            'action': action,
+            'status': status,
+        })
         self.publish('', {'request_id': request_id, 'device_id': self.device.device_id, 'action': action, 'status': status, 'reported_at': now()}, topic=self.events_topic)
 
     def tick(self):
         if self.online.is_set() and not self.paused:
             self.last = self.device.measure()
-            self.publish('telemetry', self.last)
+            info = self.publish('telemetry', self.last)
+            if info.rc == mqtt.MQTT_ERR_SUCCESS:
+                LOG.info('sensor.telemetry_published', extra={
+                    'deviceId': self.device.device_id,
+                    'eventType': 'sensor.telemetry_published',
+                    'messageId': self.last['message_id'],
+                    'topic': self.base + 'telemetry',
+                })
 
     def start(self):
         self.client.connect_async(os.getenv('MQTT_HOST', 'localhost'), int(os.getenv('MQTT_PORT', '1883')), keepalive=5)
@@ -154,7 +226,11 @@ class Sensor:
 
 
 def main():
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(JsonFormatter())
+    logging.root.setLevel(logging.INFO)
+    logging.root.addHandler(handler)
+
     interval = float(os.getenv('PUBLISH_INTERVAL', '2'))
     if not math.isfinite(interval) or interval < .1:
         raise ValueError('PUBLISH_INTERVAL doit être au moins 0.1 seconde')
@@ -176,6 +252,11 @@ def main():
     try:
         for sensor in sensors:
             sensor.start()
+        LOG.info('simulator.started', extra={
+            'eventType': 'simulator.started',
+            'deviceCount': len(sensors),
+            'deviceIds': [s.device.device_id for s in sensors],
+        })
         next_tick = time.monotonic()
         while not stop.wait(.05):
             for sensor in sensors:
@@ -187,6 +268,7 @@ def main():
     finally:
         for sensor in sensors:
             sensor.stop()
+        LOG.info('simulator.stopped', extra={'eventType': 'simulator.stopped'})
 
 
 if __name__ == '__main__':
