@@ -1,13 +1,13 @@
 type Level = 'info' | 'warn' | 'error';
 
-function log(level: Level, event: string, fields: Record<string, unknown>): void {
+function log(level: Level, eventType: string, fields: Record<string, unknown>): void {
   process.stdout.write(
-    JSON.stringify({ timestamp: new Date().toISOString(), service: 'backend', level, event, ...fields }) + '\n',
+    JSON.stringify({ timestamp: new Date().toISOString(), service: 'backend', level, eventType, ...fields }) + '\n',
   );
 }
 
 export const logger = {
-  info: (event: string, fields: Record<string, unknown> = {}) => log('info', event, fields),
-  warn: (event: string, fields: Record<string, unknown> = {}) => log('warn', event, fields),
-  error: (event: string, fields: Record<string, unknown> = {}) => log('error', event, fields),
+  info: (eventType: string, fields: Record<string, unknown> = {}) => log('info', eventType, fields),
+  warn: (eventType: string, fields: Record<string, unknown> = {}) => log('warn', eventType, fields),
+  error: (eventType: string, fields: Record<string, unknown> = {}) => log('error', eventType, fields),
 };
