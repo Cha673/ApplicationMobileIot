@@ -11,6 +11,7 @@ import { FallbackMeasurementRepository } from './infrastructure/fallback';
 import { connectMqtt } from './infrastructure/mqtt';
 import { createHttpServer } from './infrastructure/http';
 import { TelemetryService } from './application/telemetryService';
+import { logger } from './infrastructure/logger';
 
 const MQTT_HOST = process.env['MQTT_HOST'] ?? 'localhost';
 const MQTT_PORT = parseInt(process.env['MQTT_PORT'] ?? '1883', 10);
@@ -33,9 +34,9 @@ async function seedDevices(repo: PgDeviceRepository): Promise<void> {
     for (const d of list) {
       await repo.seedIfAbsent(d.device_id, d.room_id, d.label);
     }
-    console.log(`[init] seeded ${list.length} devices from ${DEVICES_PATH}`);
+    logger.info('init.devices_seeded', { count: list.length, path: DEVICES_PATH });
   } catch (err) {
-    console.warn('[init] could not seed devices:', err);
+    logger.warn('init.seed_failed', { error: String(err) });
   }
 }
 
@@ -51,7 +52,7 @@ async function main(): Promise<void> {
   await mongoClient.connect();
   const mongoDB = await initMongo(mongoClient);
   const mongoMeasurements = new MongoMeasurementRepository(mongoDB);
-  console.log('[init] connected to mongodb');
+  logger.info('init.mongodb_connected');
 
   // Reads use PostgreSQL with automatic fallback to MongoDB when PG is unavailable
   const readMeasurements = new FallbackMeasurementRepository(pgMeasurements, mongoMeasurements);
@@ -67,11 +68,11 @@ async function main(): Promise<void> {
 
   const app = createHttpServer(deviceRepo, readMeasurements);
   app.listen(API_PORT, '0.0.0.0', () => {
-    console.log(`[http] API listening on port ${API_PORT}`);
+    logger.info('http.listening', { port: API_PORT });
   });
 }
 
 main().catch((err) => {
-  console.error('[fatal]', err);
+  logger.error('fatal', { error: String(err) });
   process.exit(1);
 });

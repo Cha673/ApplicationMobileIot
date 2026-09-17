@@ -1,5 +1,6 @@
 import mqtt from 'mqtt';
 import type { TelemetryService } from '../application/telemetryService';
+import { logger } from './logger';
 
 export function connectMqtt(
   host: string,
@@ -17,7 +18,7 @@ export function connectMqtt(
   });
 
   client.on('connect', () => {
-    console.log(`[mqtt] connected to ${host}:${port}`);
+    logger.info('mqtt.connected', { host, port });
     client.subscribe(
       [
         'campus/v1/devices/+/telemetry',
@@ -26,19 +27,19 @@ export function connectMqtt(
       ],
       { qos: 1 },
       (err: Error | null) => {
-        if (err) console.error('[mqtt] subscribe error:', err);
+        if (err) logger.error('mqtt.subscribe_error', { error: err.message });
       },
     );
   });
 
   client.on('message', (topic: string, payload: Buffer) => {
     handleMessage(topic, payload.toString(), service).catch((err: unknown) =>
-      console.error(`[mqtt] handler error on ${topic}:`, err),
+      logger.error('mqtt.handler_error', { topic, error: String(err) }),
     );
   });
 
-  client.on('error', (err: Error) => console.error('[mqtt] error:', err.message));
-  client.on('reconnect', () => console.log('[mqtt] reconnecting…'));
+  client.on('error', (err: Error) => logger.error('mqtt.error', { error: err.message }));
+  client.on('reconnect', () => logger.warn('mqtt.reconnecting', { host, port }));
 }
 
 async function handleMessage(
@@ -50,12 +51,12 @@ async function handleMessage(
   try {
     data = JSON.parse(payload) as Record<string, unknown>;
   } catch {
-    console.error(`[mqtt] parse error on ${topic}`);
+    logger.error('mqtt.parse_error', { topic });
     return;
   }
 
   if (topic.endsWith('/telemetry')) {
-    await service.processTelemetry(data);
+    await service.processTelemetry(data, topic);
   } else if (topic.endsWith('/availability')) {
     const deviceId = topic.split('/')[3];
     const status = data['status'] === 'online' ? 'online' : 'offline';
