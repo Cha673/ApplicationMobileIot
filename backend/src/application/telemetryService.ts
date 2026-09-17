@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import type { SyncableMeasurementRepository, MeasurementRepository, DeviceRepository } from '../domain/repositories';
-import type { Measurement } from '../domain/types';
+import type { SyncableMeasurementRepository, MeasurementRepository, DeviceRepository, EventRepository } from '../domain/repositories';
+import type { Measurement, RejectedEvent } from '../domain/types';
 import { logger } from '../infrastructure/logger';
 
 const BATCH_SIZE = 500;
@@ -10,11 +10,21 @@ export class TelemetryService {
     private readonly rawMeasurements: SyncableMeasurementRepository,
     private readonly measurements: MeasurementRepository,
     private readonly devices: DeviceRepository,
+    private readonly events: EventRepository,
   ) {}
 
   async processTelemetry(raw: unknown, topic: string): Promise<void> {
-    const msg = parseTelemetry(raw, topic);
-    if (!msg) return;
+    const result = parseTelemetry(raw, topic);
+
+    if (!result.ok) {
+      logger.warn('telemetry.rejected', { ...result.rejection, status: 'rejected' });
+      await this.events.saveRejection(result.rejection).catch((err) =>
+        logger.warn('events.save_rejection_failed', { error: String(err) }),
+      );
+      return;
+    }
+
+    const msg = result.measurement;
 
     if (await this.rawMeasurements.existsById(msg.messageId)) {
       logger.warn('telemetry.duplicate', {
@@ -23,6 +33,9 @@ export class TelemetryService {
         eventId: msg.messageId,
         status: 'skipped',
       });
+      await this.events.saveDuplicate({ topic, deviceId: msg.deviceId, messageId: msg.messageId }).catch((err) =>
+        logger.warn('events.save_duplicate_failed', { error: String(err) }),
+      );
       return;
     }
 
@@ -68,7 +81,7 @@ export class TelemetryService {
 const TEMP_MIN = -50, TEMP_MAX = 100;   // °C — room/building sensor range
 const CO2_MIN = 0,    CO2_MAX = 5000;   // ppm — 0 impossible, 5000 dangerously high ceiling
 
-// Zod schema — structural and type checks only; physics range is validated separately
+// Zod schema — structural and type checks only; physics range validated separately
 const TelemetrySchema = z.object({
   message_id:  z.string(),
   device_id:   z.string(),
@@ -77,6 +90,10 @@ const TelemetrySchema = z.object({
   temperature: z.object({ value: z.number() }),
   co2:         z.object({ value: z.number() }),
 });
+
+type ParseResult =
+  | { ok: true;  measurement: Measurement }
+  | { ok: false; rejection: RejectedEvent };
 
 function zodReasonFor(path: (string | number)[]): string {
   switch (path[0]) {
@@ -90,13 +107,11 @@ function zodReasonFor(path: (string | number)[]): string {
   }
 }
 
-function parseTelemetry(raw: unknown, topic: string): Measurement | null {
+function parseTelemetry(raw: unknown, topic: string): ParseResult {
   const result = TelemetrySchema.safeParse(raw);
   if (!result.success) {
     const issue = result.error.issues[0];
-    const reason = zodReasonFor(issue.path);
-    logger.warn('telemetry.rejected', { topic, reason, status: 'rejected' });
-    return null;
+    return { ok: false, rejection: { topic, reason: zodReasonFor(issue.path) } };
   }
 
   const { message_id, device_id, room_id, observed_at, temperature, co2 } = result.data;
@@ -104,29 +119,36 @@ function parseTelemetry(raw: unknown, topic: string): Measurement | null {
   const co2Val  = co2.value;
 
   if (tempVal < TEMP_MIN || tempVal > TEMP_MAX) {
-    logger.warn('telemetry.rejected', {
-      topic, deviceId: device_id, eventId: message_id,
-      reason: 'value_out_of_range', field: 'temperature',
-      value: tempVal, min: TEMP_MIN, max: TEMP_MAX, status: 'rejected',
-    });
-    return null;
+    return {
+      ok: false,
+      rejection: {
+        topic, deviceId: device_id, messageId: message_id,
+        reason: 'value_out_of_range', field: 'temperature',
+        value: tempVal, min: TEMP_MIN, max: TEMP_MAX,
+      },
+    };
   }
   if (co2Val < CO2_MIN || co2Val > CO2_MAX) {
-    logger.warn('telemetry.rejected', {
-      topic, deviceId: device_id, eventId: message_id,
-      reason: 'value_out_of_range', field: 'co2',
-      value: co2Val, min: CO2_MIN, max: CO2_MAX, status: 'rejected',
-    });
-    return null;
+    return {
+      ok: false,
+      rejection: {
+        topic, deviceId: device_id, messageId: message_id,
+        reason: 'value_out_of_range', field: 'co2',
+        value: co2Val, min: CO2_MIN, max: CO2_MAX,
+      },
+    };
   }
 
   return {
-    messageId:   message_id,
-    deviceId:    device_id,
-    roomId:      room_id,
-    observedAt:  observed_at,
-    receivedAt:  new Date().toISOString(),
-    temperature: tempVal,
-    co2:         co2Val,
+    ok: true,
+    measurement: {
+      messageId:   message_id,
+      deviceId:    device_id,
+      roomId:      room_id,
+      observedAt:  observed_at,
+      receivedAt:  new Date().toISOString(),
+      temperature: tempVal,
+      co2:         co2Val,
+    },
   };
 }

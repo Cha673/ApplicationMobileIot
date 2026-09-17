@@ -5,6 +5,7 @@ import {
   runMigrations,
   PgMeasurementRepository,
   PgDeviceRepository,
+  PgEventRepository,
 } from './infrastructure/database';
 import { createMongoClient, initMongo, MongoMeasurementRepository } from './infrastructure/mongo';
 import { FallbackMeasurementRepository } from './infrastructure/fallback';
@@ -46,6 +47,7 @@ async function main(): Promise<void> {
   await runMigrations(pool);
   const pgMeasurements = new PgMeasurementRepository(pool);
   const deviceRepo = new PgDeviceRepository(pool);
+  const eventRepo = new PgEventRepository(pool);
 
   // Non-relational DB (MongoDB) — raw ingest and offline cache
   const mongoClient = createMongoClient();
@@ -60,7 +62,7 @@ async function main(): Promise<void> {
   await seedDevices(deviceRepo);
 
   // Write path: mongo first, then sync to postgres
-  const service = new TelemetryService(mongoMeasurements, pgMeasurements, deviceRepo);
+  const service = new TelemetryService(mongoMeasurements, pgMeasurements, deviceRepo, eventRepo);
 
   service.startSyncLoop(SYNC_INTERVAL_MS);
 

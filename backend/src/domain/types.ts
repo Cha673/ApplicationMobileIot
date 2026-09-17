@@ -16,3 +16,20 @@ export interface Device {
   lastSeenAt: string | null;
   lastTelemetryAt: string | null;
 }
+
+export interface RejectedEvent {
+  topic: string;
+  deviceId?: string;
+  messageId?: string;
+  reason: string;
+  field?: string;
+  value?: number;
+  min?: number;
+  max?: number;
+}
+
+export interface DuplicateEvent {
+  topic: string;
+  deviceId: string;
+  messageId: string;
+}

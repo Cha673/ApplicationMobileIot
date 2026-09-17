@@ -6,132 +6,121 @@
   "links": [],
   "panels": [
     {
-      "datasource": { "type": "loki", "uid": "loki" },
+      "datasource": { "type": "postgres", "uid": "postgres" },
+      "fieldConfig": { "defaults": {}, "overrides": [] },
       "gridPos": { "h": 8, "w": 24, "x": 0, "y": 0 },
       "id": 1,
       "options": {
-        "dedupStrategy": "none",
-        "enableLogDetails": true,
-        "prettifyLogMessage": true,
-        "showCommonLabels": false,
-        "showLabels": true,
-        "showTime": true,
-        "sortOrder": "Descending",
-        "wrapLogMessage": true
+        "cellHeight": "sm",
+        "footer": { "show": false },
+        "showHeader": true,
+        "sortBy": [{ "desc": true, "displayName": "time" }]
       },
       "targets": [
         {
-          "datasource": { "type": "loki", "uid": "loki" },
-          "expr": "{service=~\"backend|simulator\"}",
-          "queryType": "range",
+          "datasource": { "type": "postgres", "uid": "postgres" },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT received_at::timestamptz AS time, 'accepted' AS type, device_id, temperature::text AS detail FROM measurements WHERE received_at::timestamptz BETWEEN $__timeFrom() AND $__timeTo() UNION ALL SELECT rejected_at AS time, 'rejected', device_id, reason AS detail FROM rejected_events WHERE rejected_at BETWEEN $__timeFrom() AND $__timeTo() UNION ALL SELECT detected_at AS time, 'duplicate', device_id, message_id AS detail FROM duplicate_events WHERE detected_at BETWEEN $__timeFrom() AND $__timeTo() ORDER BY time DESC LIMIT 200",
           "refId": "A"
         }
       ],
-      "title": "Flux temps réel — tous les services",
-      "type": "logs"
+      "title": "Flux temps réel — tous les événements",
+      "type": "table"
     },
     {
-      "datasource": { "type": "loki", "uid": "loki" },
+      "datasource": { "type": "postgres", "uid": "postgres" },
+      "fieldConfig": { "defaults": {}, "overrides": [] },
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
       "id": 2,
       "options": {
-        "dedupStrategy": "none",
-        "enableLogDetails": true,
-        "prettifyLogMessage": true,
-        "showCommonLabels": false,
-        "showLabels": true,
-        "showTime": true,
-        "sortOrder": "Descending",
-        "wrapLogMessage": true
+        "cellHeight": "sm",
+        "footer": { "show": false },
+        "showHeader": true,
+        "sortBy": [{ "desc": true, "displayName": "time" }]
       },
       "targets": [
         {
-          "datasource": { "type": "loki", "uid": "loki" },
-          "expr": "{service=~\"backend|simulator\"} | json | deviceId=~\"$deviceId\"",
-          "queryType": "range",
+          "datasource": { "type": "postgres", "uid": "postgres" },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT received_at::timestamptz AS time, device_id, temperature, co2 FROM measurements WHERE ('${deviceId}' = '%' OR device_id = '${deviceId}') AND received_at::timestamptz BETWEEN $__timeFrom() AND $__timeTo() ORDER BY time DESC LIMIT 100",
           "refId": "A"
         }
       ],
-      "title": "Logs par device — $deviceId",
-      "type": "logs"
+      "title": "Mesures par device — $deviceId",
+      "type": "table"
     },
     {
-      "datasource": { "type": "loki", "uid": "loki" },
+      "datasource": { "type": "postgres", "uid": "postgres" },
+      "fieldConfig": { "defaults": {}, "overrides": [] },
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
       "id": 3,
       "options": {
-        "dedupStrategy": "none",
-        "enableLogDetails": true,
-        "prettifyLogMessage": true,
-        "showCommonLabels": false,
-        "showLabels": true,
-        "showTime": true,
-        "sortOrder": "Descending",
-        "wrapLogMessage": true
+        "cellHeight": "sm",
+        "footer": { "show": false },
+        "showHeader": true
       },
       "targets": [
         {
-          "datasource": { "type": "loki", "uid": "loki" },
-          "expr": "{service=~\"backend|simulator\"} | json | event=~\"mqtt.*|sensor.connected|sensor.disconnected|availability.updated\"",
-          "queryType": "range",
+          "datasource": { "type": "postgres", "uid": "postgres" },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT device_id, label, room_id, is_online AS online, last_seen_at FROM devices ORDER BY device_id",
           "refId": "A"
         }
       ],
-      "title": "Connexions MQTT & disponibilité",
-      "type": "logs"
+      "title": "État des devices",
+      "type": "table"
     },
     {
-      "datasource": { "type": "loki", "uid": "loki" },
+      "datasource": { "type": "postgres", "uid": "postgres" },
+      "fieldConfig": { "defaults": {}, "overrides": [] },
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
       "id": 4,
       "options": {
-        "dedupStrategy": "none",
-        "enableLogDetails": true,
-        "prettifyLogMessage": true,
-        "showCommonLabels": false,
-        "showLabels": true,
-        "showTime": true,
-        "sortOrder": "Descending",
-        "wrapLogMessage": true
+        "cellHeight": "sm",
+        "footer": { "show": false },
+        "showHeader": true,
+        "sortBy": [{ "desc": true, "displayName": "time" }]
       },
       "targets": [
         {
-          "datasource": { "type": "loki", "uid": "loki" },
-          "expr": "{service=\"backend\"} | json | event=\"telemetry.rejected\"",
-          "queryType": "range",
+          "datasource": { "type": "postgres", "uid": "postgres" },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT rejected_at AS time, device_id, reason, field, value, min_val AS min, max_val AS max, topic FROM rejected_events WHERE rejected_at BETWEEN $__timeFrom() AND $__timeTo() ORDER BY rejected_at DESC",
           "refId": "A"
         }
       ],
       "title": "Messages rejetés (validation)",
-      "type": "logs"
+      "type": "table"
     },
     {
-      "datasource": { "type": "loki", "uid": "loki" },
+      "datasource": { "type": "postgres", "uid": "postgres" },
+      "fieldConfig": { "defaults": {}, "overrides": [] },
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
       "id": 5,
       "options": {
-        "dedupStrategy": "none",
-        "enableLogDetails": true,
-        "prettifyLogMessage": true,
-        "showCommonLabels": false,
-        "showLabels": true,
-        "showTime": true,
-        "sortOrder": "Descending",
-        "wrapLogMessage": true
+        "cellHeight": "sm",
+        "footer": { "show": false },
+        "showHeader": true,
+        "sortBy": [{ "desc": true, "displayName": "time" }]
       },
       "targets": [
         {
-          "datasource": { "type": "loki", "uid": "loki" },
-          "expr": "{service=\"backend\"} | json | event=~\"telemetry.duplicate|sync.batch.*\"",
-          "queryType": "range",
+          "datasource": { "type": "postgres", "uid": "postgres" },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT detected_at AS time, device_id, message_id, topic FROM duplicate_events WHERE detected_at BETWEEN $__timeFrom() AND $__timeTo() ORDER BY detected_at DESC",
           "refId": "A"
         }
       ],
-      "title": "Doublons & synchronisation",
-      "type": "logs"
+      "title": "Doublons détectés",
+      "type": "table"
     },
     {
-      "datasource": { "type": "loki", "uid": "loki" },
+      "datasource": { "type": "postgres", "uid": "postgres" },
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
@@ -148,10 +137,10 @@
       },
       "targets": [
         {
-          "datasource": { "type": "loki", "uid": "loki" },
-          "expr": "avg_over_time({service=\"backend\"} | json | event=\"telemetry.saved\" | unwrap temperature [$__interval]) by (deviceId)",
-          "legendFormat": "{{deviceId}}",
-          "queryType": "range",
+          "datasource": { "type": "postgres", "uid": "postgres" },
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT observed_at::timestamptz AS time, temperature, device_id AS metric FROM measurements WHERE observed_at::timestamptz BETWEEN $__timeFrom() AND $__timeTo() ORDER BY time",
           "refId": "A"
         }
       ],
@@ -159,13 +148,12 @@
       "type": "timeseries"
     },
     {
-      "datasource": { "type": "loki", "uid": "loki" },
+      "datasource": { "type": "postgres", "uid": "postgres" },
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
           "custom": { "lineWidth": 2, "fillOpacity": 10 },
-          "unit": "short",
-          "displayName": "${__field.labels.deviceId}"
+          "unit": "short"
         },
         "overrides": []
       },
@@ -177,10 +165,10 @@
       },
       "targets": [
         {
-          "datasource": { "type": "loki", "uid": "loki" },
-          "expr": "avg_over_time({service=\"backend\"} | json | event=\"telemetry.saved\" | unwrap co2 [$__interval]) by (deviceId)",
-          "legendFormat": "{{deviceId}}",
-          "queryType": "range",
+          "datasource": { "type": "postgres", "uid": "postgres" },
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT observed_at::timestamptz AS time, co2, device_id AS metric FROM measurements WHERE observed_at::timestamptz BETWEEN $__timeFrom() AND $__timeTo() ORDER BY time",
           "refId": "A"
         }
       ],
@@ -188,7 +176,7 @@
       "type": "timeseries"
     },
     {
-      "datasource": { "type": "loki", "uid": "loki" },
+      "datasource": { "type": "postgres", "uid": "postgres" },
       "fieldConfig": {
         "defaults": {
           "color": { "fixedColor": "green", "mode": "fixed" },
@@ -208,9 +196,10 @@
       },
       "targets": [
         {
-          "datasource": { "type": "loki", "uid": "loki" },
-          "expr": "sum(count_over_time({service=\"backend\"} | json | event=\"telemetry.saved\" [$__range]))",
-          "queryType": "instant",
+          "datasource": { "type": "postgres", "uid": "postgres" },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(*) AS value FROM measurements WHERE received_at::timestamptz BETWEEN $__timeFrom() AND $__timeTo()",
           "refId": "A"
         }
       ],
@@ -218,7 +207,7 @@
       "type": "stat"
     },
     {
-      "datasource": { "type": "loki", "uid": "loki" },
+      "datasource": { "type": "postgres", "uid": "postgres" },
       "fieldConfig": {
         "defaults": {
           "color": { "fixedColor": "red", "mode": "fixed" },
@@ -238,9 +227,10 @@
       },
       "targets": [
         {
-          "datasource": { "type": "loki", "uid": "loki" },
-          "expr": "sum(count_over_time({service=\"backend\"} | json | event=\"telemetry.rejected\" [$__range]))",
-          "queryType": "instant",
+          "datasource": { "type": "postgres", "uid": "postgres" },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(*) AS value FROM rejected_events WHERE rejected_at BETWEEN $__timeFrom() AND $__timeTo()",
           "refId": "A"
         }
       ],
@@ -248,7 +238,7 @@
       "type": "stat"
     },
     {
-      "datasource": { "type": "loki", "uid": "loki" },
+      "datasource": { "type": "postgres", "uid": "postgres" },
       "fieldConfig": {
         "defaults": {
           "color": { "fixedColor": "orange", "mode": "fixed" },
@@ -268,9 +258,10 @@
       },
       "targets": [
         {
-          "datasource": { "type": "loki", "uid": "loki" },
-          "expr": "sum(count_over_time({service=\"backend\"} | json | event=\"telemetry.duplicate\" [$__range]))",
-          "queryType": "instant",
+          "datasource": { "type": "postgres", "uid": "postgres" },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(*) AS value FROM duplicate_events WHERE detected_at BETWEEN $__timeFrom() AND $__timeTo()",
           "refId": "A"
         }
       ],
@@ -284,19 +275,19 @@
   "templating": {
     "list": [
       {
-        "current": { "selected": true, "text": "All", "value": ".*" },
+        "current": { "selected": true, "text": "All", "value": "%" },
         "hide": 0,
         "includeAll": true,
         "label": "Device",
         "multi": false,
         "name": "deviceId",
         "options": [
-          { "selected": true, "text": "All", "value": ".*" },
+          { "selected": true, "text": "All", "value": "%" },
           { "selected": false, "text": "sensor-001", "value": "sensor-001" },
           { "selected": false, "text": "sensor-002", "value": "sensor-002" },
           { "selected": false, "text": "sensor-003", "value": "sensor-003" }
         ],
-        "query": ".*,sensor-001,sensor-002,sensor-003",
+        "query": "%,sensor-001,sensor-002,sensor-003",
         "skipUrlSync": false,
         "type": "custom"
       }
@@ -307,5 +298,5 @@
   "timezone": "browser",
   "title": "IoT Campus — J3 Observabilité",
   "uid": "iot-j3-obs",
-  "version": 2
+  "version": 4
 }
