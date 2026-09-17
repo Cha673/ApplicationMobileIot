@@ -1,4 +1,4 @@
-import type { Measurement, Device } from './types';
+import type { Measurement, Device, RejectedEvent, DuplicateEvent } from './types';
 
 export interface MeasurementRepository {
   save(measurement: Measurement): Promise<void>;
@@ -23,4 +23,9 @@ export interface DeviceRepository {
   updateStatus(deviceId: string, isOnline: boolean, lastSeenAt: string): Promise<void>;
   findAll(): Promise<Device[]>;
   findById(deviceId: string): Promise<Device | null>;
+}
+
+export interface EventRepository {
+  saveRejection(event: RejectedEvent): Promise<void>;
+  saveDuplicate(event: DuplicateEvent): Promise<void>;
 }

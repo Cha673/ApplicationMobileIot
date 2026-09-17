@@ -1,0 +1,15 @@
+apiVersion: 1
+datasources:
+  - name: PostgreSQL
+    type: postgres
+    uid: postgres
+    url: postgres:5432
+    database: campus
+    user: campus
+    secureJsonData:
+      password: campus-demo
+    jsonData:
+      sslmode: disable
+      postgresVersion: 1600
+      timescaledb: false
+    isDefault: false
