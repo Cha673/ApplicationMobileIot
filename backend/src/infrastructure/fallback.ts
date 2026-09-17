@@ -1,5 +1,6 @@
 import type { MeasurementRepository } from '../domain/repositories';
 import type { Measurement } from '../domain/types';
+import { logger } from './logger';
 
 export class FallbackMeasurementRepository implements MeasurementRepository {
   constructor(
@@ -26,8 +27,8 @@ export class FallbackMeasurementRepository implements MeasurementRepository {
   async findLatestByDevice(deviceId: string): Promise<Measurement | null> {
     try {
       return await this.primary.findLatestByDevice(deviceId);
-    } catch {
-      console.warn('[fallback] postgres unavailable, reading from mongo');
+    } catch (err) {
+      logger.warn('fallback.postgres_unavailable', { operation: 'findLatestByDevice', error: String(err) });
       return this.fallback.findLatestByDevice(deviceId);
     }
   }
@@ -35,8 +36,8 @@ export class FallbackMeasurementRepository implements MeasurementRepository {
   async findHistoryByDevice(deviceId: string, limit: number): Promise<Measurement[]> {
     try {
       return await this.primary.findHistoryByDevice(deviceId, limit);
-    } catch {
-      console.warn('[fallback] postgres unavailable, reading from mongo');
+    } catch (err) {
+      logger.warn('fallback.postgres_unavailable', { operation: 'findHistoryByDevice', error: String(err) });
       return this.fallback.findHistoryByDevice(deviceId, limit);
     }
   }
@@ -48,8 +49,8 @@ export class FallbackMeasurementRepository implements MeasurementRepository {
   ): Promise<number | null> {
     try {
       return await this.primary.findAverageTemperatureByDevice(deviceId, from, to);
-    } catch {
-      console.warn('[fallback] postgres unavailable, reading average from mongo');
+    } catch (err) {
+      logger.warn('fallback.postgres_unavailable', { operation: 'findAverageTemperature', error: String(err) });
       return this.fallback.findAverageTemperatureByDevice(deviceId, from, to);
     }
   }
