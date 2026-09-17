@@ -51,7 +51,7 @@ async function handleMessage(
   try {
     data = JSON.parse(payload) as Record<string, unknown>;
   } catch {
-    logger.error('mqtt.parse_error', { topic });
+    logger.error('mqtt.parse_error', { topic, reason: 'invalid_json' });
     return;
   }
 
@@ -60,6 +60,6 @@ async function handleMessage(
   } else if (topic.endsWith('/availability')) {
     const deviceId = topic.split('/')[3];
     const status = data['status'] === 'online' ? 'online' : 'offline';
-    await service.processAvailability(deviceId, status);
+    await service.processAvailability(deviceId, status, topic);
   }
 }

@@ -37,9 +37,12 @@ scrape_configs:
             - json:
                 expressions:
                   level: level
-                  event: event
+                  eventType: eventType
                   deviceId: deviceId
+                  status: status
+            # Low-cardinality fields only — eventId, reason, topic stay as log line content
             - labels:
                 level:
-                event:
+                eventType:
                 deviceId:
+                status:

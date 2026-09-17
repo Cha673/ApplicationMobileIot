@@ -99,6 +99,26 @@ services:
     restart: unless-stopped
     init: true
 
+  loki:
+    image: grafana/loki:2.9.4
+    command: -config.file=/etc/loki/config.yaml
+    volumes:
+      - ./observability/loki/config.yaml:/etc/loki/config.yaml:ro
+      - loki-data:/loki
+    ports:
+      - "127.0.0.1:3100:3100"
+    restart: unless-stopped
+
+  promtail:
+    image: grafana/promtail:2.9.4
+    command: -config.file=/etc/promtail/config.yaml
+    volumes:
+      - ./observability/promtail/config.yaml:/etc/promtail/config.yaml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      - loki
+    restart: unless-stopped
+
   grafana:
     image: grafana/grafana:10.4.2
     environment:
@@ -111,6 +131,8 @@ services:
     volumes:
       - grafana-data:/var/lib/grafana
       - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      - loki
     restart: unless-stopped
 
   tools:
@@ -146,3 +168,4 @@ volumes:
   pg-data:
   mongo-data:
   grafana-data:
+  loki-data:
