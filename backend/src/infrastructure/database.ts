@@ -63,6 +63,11 @@ export async function runMigrations(pool: Pool): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_duplicate_events_at
       ON duplicate_events (detected_at DESC);
   `);
+
+  // Additive column migrations (idempotent)
+  await pool.query(`
+    ALTER TABLE devices ADD COLUMN IF NOT EXISTS last_telemetry_at TEXT;
+  `);
 }
 
 export class PgMeasurementRepository implements MeasurementRepository {
@@ -204,10 +209,11 @@ function toMeasurement(r: Record<string, unknown>): Measurement {
 
 function toDevice(r: Record<string, unknown>): Device {
   return {
-    deviceId:    r["device_id"] as string,
-    roomId:      r["room_id"] as string,
-    label:       r["label"] as string,
-    isOnline:    r["is_online"] as boolean,
-    lastSeenAt:  r["last_seen_at"] as string | null,
+    deviceId:       r["device_id"] as string,
+    roomId:         r["room_id"] as string,
+    label:          r["label"] as string,
+    isOnline:       r["is_online"] as boolean,
+    lastSeenAt:     r["last_seen_at"] as string | null,
+    lastTelemetryAt: r["last_telemetry_at"] as string | null,
   };
 }
