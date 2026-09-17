@@ -6,6 +6,7 @@
     "orientation": "portrait",
     "newArchEnabled": false,
     "userInterfaceStyle": "light",
+    "plugins": ["expo-notifications"],
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",

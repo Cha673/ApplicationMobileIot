@@ -40,6 +40,7 @@ export class TelemetryService {
     }
 
     await this.rawMeasurements.save(msg);
+    await this.devices.updateTelemetrySeen(msg.deviceId, msg.receivedAt);
     logger.info('telemetry.saved', {
       topic,
       deviceId: msg.deviceId,
@@ -85,7 +86,7 @@ const TelemetrySchema = z.object({
   message_id:  z.string(),
   device_id:   z.string(),
   room_id:     z.string(),
-  observed_at: z.string(),
+  observed_at: z.string().refine((value) => !Number.isNaN(Date.parse(value)), 'invalid date'),
   temperature: z.object({ value: z.number() }),
   co2:         z.object({ value: z.number() }),
 });

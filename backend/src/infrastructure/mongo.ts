@@ -22,7 +22,7 @@ export async function initMongo(client: MongoClient): Promise<Db> {
   const db = client.db();
   const col = db.collection('measurements');
   await col.createIndex({ message_id: 1 }, { unique: true });
-  await col.createIndex({ device_id: 1, observed_at: -1 });
+  await col.createIndex({ device_id: 1, observed_at: -1, received_at: -1, message_id: -1 });
   await col.createIndex({ synced: 1 });
   return db;
 }
@@ -61,7 +61,7 @@ export class MongoMeasurementRepository implements SyncableMeasurementRepository
   async findLatestByDevice(deviceId: string): Promise<Measurement | null> {
     const doc = await this.col.findOne(
       { device_id: deviceId },
-      { sort: { observed_at: -1 } },
+      { sort: { observed_at: -1, received_at: -1, message_id: -1 } },
     );
     return doc ? fromDoc(doc) : null;
   }
@@ -69,7 +69,7 @@ export class MongoMeasurementRepository implements SyncableMeasurementRepository
   async findHistoryByDevice(deviceId: string, limit: number): Promise<Measurement[]> {
     const docs = await this.col
       .find({ device_id: deviceId })
-      .sort({ observed_at: -1 })
+      .sort({ observed_at: -1, received_at: -1, message_id: -1 })
       .limit(limit)
       .toArray();
     return docs.map(fromDoc);

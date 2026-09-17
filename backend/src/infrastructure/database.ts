@@ -29,7 +29,8 @@ export async function runMigrations(pool: Pool): Promise<void> {
       room_id      TEXT NOT NULL DEFAULT '',
       label        TEXT NOT NULL DEFAULT '',
       is_online    BOOLEAN NOT NULL DEFAULT false,
-      last_seen_at TEXT
+      last_seen_at TEXT,
+      last_telemetry_at TEXT
     );
 
     CREATE TABLE IF NOT EXISTS rejected_events (
@@ -102,7 +103,7 @@ export class PgMeasurementRepository implements MeasurementRepository {
 
   async findLatestByDevice(deviceId: string): Promise<Measurement | null> {
     const result = await this.pool.query(
-      "SELECT * FROM measurements WHERE device_id = $1 ORDER BY observed_at DESC LIMIT 1",
+      "SELECT * FROM measurements WHERE device_id = $1 ORDER BY observed_at DESC, received_at DESC, message_id DESC LIMIT 1",
       [deviceId],
     );
     return result.rows[0] ? toMeasurement(result.rows[0]) : null;
@@ -110,7 +111,7 @@ export class PgMeasurementRepository implements MeasurementRepository {
 
   async findHistoryByDevice(deviceId: string, limit: number): Promise<Measurement[]> {
     const result = await this.pool.query(
-      "SELECT * FROM measurements WHERE device_id = $1 ORDER BY observed_at DESC LIMIT $2",
+      "SELECT * FROM measurements WHERE device_id = $1 ORDER BY observed_at DESC, received_at DESC, message_id DESC LIMIT $2",
       [deviceId, limit],
     );
     return result.rows.map(toMeasurement);
@@ -144,6 +145,13 @@ export class PgDeviceRepository implements DeviceRepository {
     await this.pool.query(
       "UPDATE devices SET is_online = $1, last_seen_at = $2 WHERE device_id = $3",
       [isOnline, lastSeenAt, deviceId],
+    );
+  }
+
+  async updateTelemetrySeen(deviceId: string, receivedAt: string): Promise<void> {
+    await this.pool.query(
+      "UPDATE devices SET last_telemetry_at = $1 WHERE device_id = $2",
+      [receivedAt, deviceId],
     );
   }
 

@@ -46,6 +46,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-campus-demo}
       MONGO_URI: mongodb://mongodb:27017/campus
       SYNC_INTERVAL_MS: ${SYNC_INTERVAL_MS:-5000}
+      FRESHNESS_THRESHOLD_MS: ${FRESHNESS_THRESHOLD_MS:-10000}
       DEVICES_PATH: /app/devices.json
     volumes:
       - ./devices.json:/app/devices.json:ro

@@ -70,3 +70,23 @@
 {"_e":"metro:bundling:progress","_t":1789549216098,"id":"1","progress":0.9401569499292383,"total":757,"current":734}
 {"_e":"metro:bundling:done","_t":1789549216138,"id":"1","total":757,"ms":348.185209}
 {"_e":"metro:client_log","_t":1789549218043,"level":"warn","data":["SafeAreaView has been deprecated and will be removed in a future release. Please use 'react-native-safe-area-context' instead. See https://github.com/AppAndFlow/react-native-safe-area-context"]}
+{"_e":"root:init","_t":1789631648595,"format":"v0-jsonl","version":"57.0.24"}
+{"_e":"env:mode","_t":1789631648596,"nodeEnv":"development","babelEnv":"development","mode":"development"}
+{"_e":"env:load","_t":1789631648602,"mode":"development","files":["../..\\..\\.env.local"],"env":{"EXPO_PUBLIC_API_URL":"http://10.217.76.143:3000"}}
+{"_e":"devserver:start","_t":1789631651005,"mode":"development","web":true,"baseUrl":"","asyncRoutes":false,"routerRoot":"../..\\..\\app","serverComponents":false,"serverActions":false,"serverRendering":false,"apiRoutes":false,"exporting":false}
+{"_e":"metro:config","_t":1789631653145,"serverRoot":"../..\\..","projectRoot":"../..\\..","exporting":false,"flags":{"autolinkingModuleResolution":false,"serverActions":false,"serverComponents":false,"reactCompiler":false,"optimizeGraph":false,"treeshaking":false,"logbox":false}}
+{"_e":"expo:dev-tools-plugin:load","_t":1789631655000,"plugins":[]}
+{"_e":"metro:instantiate","_t":1789631669524,"atlas":false,"workers":8,"host":"::","port":8081}
+{"_e":"root:init","_t":1789631742673,"format":"v0-jsonl","version":"57.0.24"}
+{"_e":"env:mode","_t":1789631742674,"nodeEnv":"development","babelEnv":"development","mode":"development"}
+{"_e":"env:load","_t":1789631742679,"mode":"development","files":["../..\\..\\.env.local"],"env":{"EXPO_PUBLIC_API_URL":"http://10.217.76.143:3000"}}
+{"_e":"root:init","_t":1789631779059,"format":"v0-jsonl","version":"57.0.24"}
+{"_e":"env:mode","_t":1789631779060,"nodeEnv":"development","babelEnv":"development","mode":"development"}
+{"_e":"env:load","_t":1789631779067,"mode":"development","files":["../..\\..\\.env.local"],"env":{"EXPO_PUBLIC_API_URL":"http://10.217.76.143:3000"}}
+{"_e":"root:init","_t":1789631813580,"format":"v0-jsonl","version":"57.0.24"}
+{"_e":"env:mode","_t":1789631813583,"nodeEnv":"development","babelEnv":"development","mode":"development"}
+{"_e":"env:load","_t":1789631813593,"mode":"development","files":["../..\\..\\.env.local"],"env":{"EXPO_PUBLIC_API_URL":"http://10.217.76.143:3000"}}
+{"_e":"devserver:start","_t":1789631815575,"mode":"development","web":true,"baseUrl":"","asyncRoutes":false,"routerRoot":"../..\\..\\app","serverComponents":false,"serverActions":false,"serverRendering":false,"apiRoutes":false,"exporting":false}
+{"_e":"metro:config","_t":1789631816061,"serverRoot":"../..\\..","projectRoot":"../..\\..","exporting":false,"flags":{"autolinkingModuleResolution":false,"serverActions":false,"serverComponents":false,"reactCompiler":false,"optimizeGraph":false,"treeshaking":false,"logbox":false}}
+{"_e":"expo:dev-tools-plugin:load","_t":1789631816406,"plugins":[]}
+{"_e":"metro:instantiate","_t":1789631825207,"atlas":false,"workers":8,"host":"::","port":8082}

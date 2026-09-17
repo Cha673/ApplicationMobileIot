@@ -27,7 +27,9 @@ export interface Room {
   label: string;
   deviceId: string;
   isOnline: boolean;
+  isStale: boolean;
   lastSeenAt: string | null;
+  lastTelemetryAt: string | null;
   latestMeasurement: LatestMeasurement | null;
 }
 
