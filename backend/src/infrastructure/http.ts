@@ -2,6 +2,11 @@ import express from 'express';
 import type { DeviceRepository, MeasurementRepository } from '../domain/repositories';
 
 const HISTORY_LIMIT = 50;
+const FRESHNESS_THRESHOLD_MS = Number(process.env['FRESHNESS_THRESHOLD_MS'] ?? 10000);
+
+function isStale(lastTelemetryAt: string | null): boolean {
+  return lastTelemetryAt === null || Date.now() - Date.parse(lastTelemetryAt) > FRESHNESS_THRESHOLD_MS;
+}
 
 function parseHistoryLimit(rawLimit: unknown): number {
   const requestedLimit = Number(rawLimit);
@@ -47,6 +52,8 @@ export function createHttpServer(
         deviceId: device.deviceId,
         isOnline: device.isOnline,
         lastSeenAt: device.lastSeenAt,
+        lastTelemetryAt: device.lastTelemetryAt,
+        isStale: isStale(device.lastTelemetryAt),
         latestMeasurement: await measurements.findLatestByDevice(device.deviceId),
       })),
     );
@@ -66,6 +73,8 @@ export function createHttpServer(
       deviceId: device.deviceId,
       isOnline: device.isOnline,
       lastSeenAt: device.lastSeenAt,
+      lastTelemetryAt: device.lastTelemetryAt,
+      isStale: isStale(device.lastTelemetryAt),
       latestMeasurement: await measurements.findLatestByDevice(device.deviceId),
     });
   });

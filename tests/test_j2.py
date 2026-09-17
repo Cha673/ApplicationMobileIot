@@ -93,6 +93,8 @@ class J2Tests(unittest.TestCase):
 
         room = api_get('/api/rooms/salle-203')
         current_latest = room['latestMeasurement']['observedAt']
+        current_temperature = room['latestMeasurement']['temperature']
+        current_co2 = room['latestMeasurement']['co2']
 
         # Injecter une mesure avec observed_at = 60 s dans le passé (nouveau message_id)
         self.p.control('delay')
@@ -106,6 +108,19 @@ class J2Tests(unittest.TestCase):
             current_latest,
             'la mesure retardée a écrasé l\'état courant',
         )
+        self.assertEqual(room_after['latestMeasurement']['temperature'], current_temperature)
+        self.assertEqual(room_after['latestMeasurement']['co2'], current_co2)
+
+    def test_paused_sensor_becomes_stale(self):
+        """Jalon J3 : le silence télémétrique est distinct de la disponibilité MQTT."""
+        self._telemetry()
+        self.p.control('pause')
+        time.sleep(11)
+
+        room = api_get('/api/rooms/salle-203')
+        self.assertTrue(room['isOnline'], 'la disponibilité MQTT ne devrait pas changer sur pause')
+        self.assertTrue(room['isStale'], 'un capteur silencieux doit être marqué stale')
+        self.assertIsNotNone(room['lastTelemetryAt'])
 
     def test_volume_history_contains_no_business_duplicate(self):
         """Milestone J2 : un volume de mesures avec doublons ne corrompt pas l'historique."""

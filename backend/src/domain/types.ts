@@ -14,4 +14,5 @@ export interface Device {
   label: string;
   isOnline: boolean;
   lastSeenAt: string | null;
+  lastTelemetryAt: string | null;
 }

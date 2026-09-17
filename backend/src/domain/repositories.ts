@@ -1,4 +1,4 @@
-import type { Measurement, Device } from './types';
+import type { Measurement, Device } from "./types";
 
 export interface MeasurementRepository {
   save(measurement: Measurement): Promise<void>;
@@ -20,7 +20,12 @@ export interface SyncableMeasurementRepository extends MeasurementRepository {
 
 export interface DeviceRepository {
   seedIfAbsent(deviceId: string, roomId: string, label: string): Promise<void>;
-  updateStatus(deviceId: string, isOnline: boolean, lastSeenAt: string): Promise<void>;
+  updateStatus(
+    deviceId: string,
+    isOnline: boolean,
+    lastSeenAt: string,
+  ): Promise<void>;
+  updateTelemetrySeen(deviceId: string, receivedAt: string): Promise<void>;
   findAll(): Promise<Device[]>;
   findById(deviceId: string): Promise<Device | null>;
 }
