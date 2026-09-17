@@ -21,7 +21,7 @@
           "datasource": { "type": "postgres", "uid": "postgres" },
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT received_at::timestamptz AS time, 'accepted' AS type, device_id, temperature::text AS detail FROM measurements WHERE received_at::timestamptz BETWEEN $__timeFrom() AND $__timeTo() UNION ALL SELECT rejected_at AS time, 'rejected', device_id, reason AS detail FROM rejected_events WHERE rejected_at BETWEEN $__timeFrom() AND $__timeTo() UNION ALL SELECT detected_at AS time, 'duplicate', device_id, message_id AS detail FROM duplicate_events WHERE detected_at BETWEEN $__timeFrom() AND $__timeTo() ORDER BY time DESC LIMIT 200",
+          "rawSql": "SELECT received_at::timestamptz AS time, 'accepted' AS type, device_id, temperature::text AS detail FROM measurements WHERE received_at::timestamptz BETWEEN $__timeFrom() AND $__timeTo() AND ('${deviceId}' = '%' OR device_id = '${deviceId}') UNION ALL SELECT rejected_at AS time, 'rejected', device_id, reason AS detail FROM rejected_events WHERE rejected_at BETWEEN $__timeFrom() AND $__timeTo() AND ('${deviceId}' = '%' OR device_id = '${deviceId}') UNION ALL SELECT detected_at AS time, 'duplicate', device_id, message_id AS detail FROM duplicate_events WHERE detected_at BETWEEN $__timeFrom() AND $__timeTo() AND ('${deviceId}' = '%' OR device_id = '${deviceId}') ORDER BY time DESC LIMIT 200",
           "refId": "A"
         }
       ],
@@ -89,7 +89,7 @@
           "datasource": { "type": "postgres", "uid": "postgres" },
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT rejected_at AS time, device_id, reason, field, value, min_val AS min, max_val AS max, topic FROM rejected_events WHERE rejected_at BETWEEN $__timeFrom() AND $__timeTo() ORDER BY rejected_at DESC",
+          "rawSql": "SELECT rejected_at AS time, device_id, reason, field, value, min_val AS min, max_val AS max, topic FROM rejected_events WHERE rejected_at BETWEEN $__timeFrom() AND $__timeTo() AND ('${deviceId}' = '%' OR device_id = '${deviceId}') ORDER BY rejected_at DESC",
           "refId": "A"
         }
       ],
@@ -112,7 +112,7 @@
           "datasource": { "type": "postgres", "uid": "postgres" },
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT detected_at AS time, device_id, message_id, topic FROM duplicate_events WHERE detected_at BETWEEN $__timeFrom() AND $__timeTo() ORDER BY detected_at DESC",
+          "rawSql": "SELECT detected_at AS time, device_id, message_id, topic FROM duplicate_events WHERE detected_at BETWEEN $__timeFrom() AND $__timeTo() AND ('${deviceId}' = '%' OR device_id = '${deviceId}') ORDER BY detected_at DESC",
           "refId": "A"
         }
       ],
@@ -267,6 +267,84 @@
       ],
       "title": "Doublons détectés",
       "type": "stat"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "postgres" },
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 36 },
+      "id": 11,
+      "options": {
+        "cellHeight": "sm",
+        "footer": { "show": false },
+        "showHeader": true,
+        "sortBy": [{ "desc": true, "displayName": "staleness_ms" }]
+      },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "postgres" },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT received_at::timestamptz AS time, device_id, message_id, observed_at, ROUND(EXTRACT(EPOCH FROM (received_at::timestamptz - observed_at::timestamptz)) * 1000) AS staleness_ms FROM measurements WHERE (received_at::timestamptz - observed_at::timestamptz) > interval '10 seconds' AND received_at::timestamptz BETWEEN $__timeFrom() AND $__timeTo() ORDER BY staleness_ms DESC LIMIT 100",
+          "refId": "A"
+        }
+      ],
+      "title": "Données anciennes (retard > 10 s)",
+      "type": "table"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 36 },
+      "id": 12,
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": true,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "{service=\"backend\", eventType=~\"mqtt\\.(error|parse_error|subscribe_error|reconnecting|handler_error)\"}",
+          "legendFormat": "",
+          "refId": "A"
+        }
+      ],
+      "title": "Erreurs de connexion MQTT",
+      "type": "logs"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "postgres" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "fixedColor": "purple", "mode": "fixed" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "purple", "value": null }] }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 8, "x": 0, "y": 44 },
+      "id": 13,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "postgres" },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(*) AS value FROM measurements WHERE (received_at::timestamptz - observed_at::timestamptz) > interval '10 seconds' AND received_at::timestamptz BETWEEN $__timeFrom() AND $__timeTo()",
+          "refId": "A"
+        }
+      ],
+      "title": "Données anciennes",
+      "type": "stat"
     }
   ],
   "refresh": "5s",
@@ -275,28 +353,27 @@
   "templating": {
     "list": [
       {
-        "current": { "selected": true, "text": "All", "value": "%" },
+        "current": { "selected": true, "text": "All", "value": "$__all" },
+        "datasource": { "type": "postgres", "uid": "postgres" },
+        "definition": "SELECT device_id FROM devices ORDER BY device_id",
         "hide": 0,
         "includeAll": true,
+        "allValue": "%",
         "label": "Device",
         "multi": false,
         "name": "deviceId",
-        "options": [
-          { "selected": true, "text": "All", "value": "%" },
-          { "selected": false, "text": "sensor-001", "value": "sensor-001" },
-          { "selected": false, "text": "sensor-002", "value": "sensor-002" },
-          { "selected": false, "text": "sensor-003", "value": "sensor-003" }
-        ],
-        "query": "%,sensor-001,sensor-002,sensor-003",
+        "query": "SELECT device_id FROM devices ORDER BY device_id",
+        "refresh": 2,
         "skipUrlSync": false,
-        "type": "custom"
+        "sort": 1,
+        "type": "query"
       }
     ]
   },
-  "time": { "from": "now-15m", "to": "now" },
+  "time": { "from": "now-6h", "to": "now" },
   "timepicker": {},
   "timezone": "browser",
   "title": "IoT Campus — J3 Observabilité",
   "uid": "iot-j3-obs",
-  "version": 4
+  "version": 6
 }

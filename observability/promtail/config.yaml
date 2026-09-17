@@ -37,9 +37,11 @@ scrape_configs:
             - json:
                 expressions:
                   level: level
-                  event: event
+                  eventType: eventType
                   deviceId: deviceId
+                  status: status
             - labels:
                 level:
-                event:
+                eventType:
                 deviceId:
+                status:
