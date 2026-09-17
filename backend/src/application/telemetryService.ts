@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import type { SyncableMeasurementRepository, MeasurementRepository, DeviceRepository } from '../domain/repositories';
 import type { Measurement } from '../domain/types';
 import { logger } from '../infrastructure/logger';
@@ -62,52 +63,69 @@ export class TelemetryService {
   }
 }
 
+// Physical bounds for sensor readings
+const TEMP_MIN = -50, TEMP_MAX = 100;   // °C — room/building sensor range
+const CO2_MIN = 0,    CO2_MAX = 5000;   // ppm — 0 impossible, 5000 dangerously high ceiling
+
+// Zod schema — structural and type checks only; physics range is validated separately
+const TelemetrySchema = z.object({
+  message_id:  z.string(),
+  device_id:   z.string(),
+  room_id:     z.string(),
+  observed_at: z.string(),
+  temperature: z.object({ value: z.number() }),
+  co2:         z.object({ value: z.number() }),
+});
+
+function zodReasonFor(path: (string | number)[]): string {
+  switch (path[0]) {
+    case 'message_id':  return 'missing_message_id';
+    case 'device_id':   return 'missing_device_id';
+    case 'room_id':     return 'missing_room_id';
+    case 'observed_at': return 'missing_observed_at';
+    case 'temperature': return 'invalid_temperature';
+    case 'co2':         return 'invalid_co2';
+    default:            return 'invalid_payload';
+  }
+}
+
 function parseTelemetry(raw: unknown, topic: string): Measurement | null {
-  if (!raw || typeof raw !== 'object') {
-    logger.warn('telemetry.rejected', { topic, reason: 'not_an_object', status: 'rejected' });
+  const result = TelemetrySchema.safeParse(raw);
+  if (!result.success) {
+    const issue = result.error.issues[0];
+    const reason = zodReasonFor(issue.path);
+    logger.warn('telemetry.rejected', { topic, reason, status: 'rejected' });
     return null;
   }
 
-  const msg = raw as Record<string, unknown>;
-  const deviceId = typeof msg['device_id'] === 'string' ? msg['device_id'] : undefined;
-  const messageId = typeof msg['message_id'] === 'string' ? msg['message_id'] : undefined;
+  const { message_id, device_id, room_id, observed_at, temperature, co2 } = result.data;
+  const tempVal = temperature.value;
+  const co2Val  = co2.value;
 
-  if (typeof msg['message_id'] !== 'string') {
-    logger.warn('telemetry.rejected', { topic, deviceId, reason: 'missing_message_id', status: 'rejected' });
+  if (tempVal < TEMP_MIN || tempVal > TEMP_MAX) {
+    logger.warn('telemetry.rejected', {
+      topic, deviceId: device_id, eventId: message_id,
+      reason: 'value_out_of_range', field: 'temperature',
+      value: tempVal, min: TEMP_MIN, max: TEMP_MAX, status: 'rejected',
+    });
     return null;
   }
-  if (typeof msg['device_id'] !== 'string') {
-    logger.warn('telemetry.rejected', { topic, messageId, reason: 'missing_device_id', status: 'rejected' });
-    return null;
-  }
-  if (typeof msg['room_id'] !== 'string') {
-    logger.warn('telemetry.rejected', { topic, deviceId, eventId: messageId, reason: 'missing_room_id', status: 'rejected' });
-    return null;
-  }
-  if (typeof msg['observed_at'] !== 'string') {
-    logger.warn('telemetry.rejected', { topic, deviceId, eventId: messageId, reason: 'missing_observed_at', status: 'rejected' });
-    return null;
-  }
-
-  const temp = msg['temperature'] as Record<string, unknown> | undefined;
-  const co2 = msg['co2'] as Record<string, unknown> | undefined;
-
-  if (!temp || typeof temp['value'] !== 'number') {
-    logger.warn('telemetry.rejected', { topic, deviceId, eventId: messageId, reason: 'invalid_temperature', status: 'rejected' });
-    return null;
-  }
-  if (!co2 || typeof co2['value'] !== 'number') {
-    logger.warn('telemetry.rejected', { topic, deviceId, eventId: messageId, reason: 'invalid_co2', status: 'rejected' });
+  if (co2Val < CO2_MIN || co2Val > CO2_MAX) {
+    logger.warn('telemetry.rejected', {
+      topic, deviceId: device_id, eventId: message_id,
+      reason: 'value_out_of_range', field: 'co2',
+      value: co2Val, min: CO2_MIN, max: CO2_MAX, status: 'rejected',
+    });
     return null;
   }
 
   return {
-    messageId: msg['message_id'] as string,
-    deviceId: msg['device_id'] as string,
-    roomId: msg['room_id'] as string,
-    observedAt: msg['observed_at'] as string,
-    receivedAt: new Date().toISOString(),
-    temperature: temp['value'] as number,
-    co2: co2['value'] as number,
+    messageId:   message_id,
+    deviceId:    device_id,
+    roomId:      room_id,
+    observedAt:  observed_at,
+    receivedAt:  new Date().toISOString(),
+    temperature: tempVal,
+    co2:         co2Val,
   };
 }
