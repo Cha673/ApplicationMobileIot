@@ -1,11 +1,29 @@
-user simulator
-topic write campus/v1/devices/+/telemetry
-topic write campus/v1/devices/+/state
-topic write campus/v1/devices/+/availability
-topic write campus/v1/devices/+/results
-topic read campus/v1/devices/+/commands
-topic read campus/v1/simulator/+/control
-topic write campus/v1/simulator/+/events
+user sensor-001
+topic write campus/v1/devices/sensor-001/telemetry
+topic write campus/v1/devices/sensor-001/state
+topic write campus/v1/devices/sensor-001/availability
+topic write campus/v1/devices/sensor-001/results
+topic read campus/v1/devices/sensor-001/commands
+topic read campus/v1/simulator/sensor-001/control
+topic write campus/v1/simulator/sensor-001/events
+
+user sensor-002
+topic write campus/v1/devices/sensor-002/telemetry
+topic write campus/v1/devices/sensor-002/state
+topic write campus/v1/devices/sensor-002/availability
+topic write campus/v1/devices/sensor-002/results
+topic read campus/v1/devices/sensor-002/commands
+topic read campus/v1/simulator/sensor-002/control
+topic write campus/v1/simulator/sensor-002/events
+
+user sensor-003
+topic write campus/v1/devices/sensor-003/telemetry
+topic write campus/v1/devices/sensor-003/state
+topic write campus/v1/devices/sensor-003/availability
+topic write campus/v1/devices/sensor-003/results
+topic read campus/v1/devices/sensor-003/commands
+topic read campus/v1/simulator/sensor-003/control
+topic write campus/v1/simulator/sensor-003/events
 
 user backend
 topic read campus/v1/devices/+/telemetry
