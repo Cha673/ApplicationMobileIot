@@ -1,4 +1,4 @@
-import type { Measurement, Device, RejectedEvent, DuplicateEvent } from './types';
+import type { Measurement, Device, RejectedEvent, DuplicateEvent, RawEvent } from './types';
 
 export interface MeasurementRepository {
   save(measurement: Measurement): Promise<void>;
@@ -33,4 +33,12 @@ export interface DeviceRepository {
 export interface EventRepository {
   saveRejection(event: RejectedEvent): Promise<void>;
   saveDuplicate(event: DuplicateEvent): Promise<void>;
+}
+
+export interface RawEventRepository {
+  save(topic: string, payload: string, receivedAt: string): Promise<string>;
+  findPending(limit: number): Promise<RawEvent[]>;
+  markAccepted(id: string, processedAt: string): Promise<void>;
+  markRejected(id: string, error: string, processedAt: string): Promise<void>;
+  markDuplicate(id: string, processedAt: string): Promise<void>;
 }

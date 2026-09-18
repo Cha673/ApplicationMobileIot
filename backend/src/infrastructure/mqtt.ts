@@ -1,5 +1,4 @@
 import mqtt from 'mqtt';
-import { randomUUID } from 'crypto';
 import type { TelemetryService } from '../application/telemetryService';
 import { logger } from './logger';
 
@@ -13,8 +12,8 @@ export function connectMqtt(
   const client = mqtt.connect(`mqtt://${host}:${port}`, {
     username,
     password,
-    clientId: `backend-${Date.now()}`,
-    clean: true,
+    clientId: 'backend-primary',
+    clean: false,
     reconnectPeriod: 3000,
   });
 
@@ -48,22 +47,16 @@ async function handleMessage(
   payload: string,
   service: TelemetryService,
 ): Promise<void> {
-  const correlationId = randomUUID();
-  let data: Record<string, unknown>;
-  try {
-    data = JSON.parse(payload) as Record<string, unknown>;
-  } catch {
-    logger.error('mqtt.parse_error', { topic, eventId: correlationId, reason: 'invalid_json' });
-    return;
-  }
-
   if (topic.endsWith('/telemetry')) {
-    const eventId = typeof data['message_id'] === 'string' && data['message_id']
-      ? data['message_id']
-      : correlationId;
-    logger.info('mqtt.message_received', { topic, eventId });
-    await service.processTelemetry(data, topic, eventId);
+    await service.saveRaw(topic, payload);
   } else if (topic.endsWith('/availability')) {
+    let data: Record<string, unknown>;
+    try {
+      data = JSON.parse(payload) as Record<string, unknown>;
+    } catch {
+      logger.error('mqtt.parse_error', { topic, reason: 'invalid_json' });
+      return;
+    }
     const deviceId = topic.split('/')[3];
     const status = data['status'] === 'online' ? 'online' : 'offline';
     await service.processAvailability(deviceId, status, topic);

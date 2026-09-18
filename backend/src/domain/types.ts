@@ -33,3 +33,13 @@ export interface DuplicateEvent {
   deviceId: string;
   messageId: string;
 }
+
+export interface RawEvent {
+  id: string;
+  topic: string;
+  payload: string;
+  receivedAt: string;
+  status: 'pending' | 'accepted' | 'rejected' | 'duplicate';
+  error?: string;
+  processedAt?: string;
+}
