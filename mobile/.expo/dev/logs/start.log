@@ -90,3 +90,150 @@
 {"_e":"metro:config","_t":1789631816061,"serverRoot":"../..\\..","projectRoot":"../..\\..","exporting":false,"flags":{"autolinkingModuleResolution":false,"serverActions":false,"serverComponents":false,"reactCompiler":false,"optimizeGraph":false,"treeshaking":false,"logbox":false}}
 {"_e":"expo:dev-tools-plugin:load","_t":1789631816406,"plugins":[]}
 {"_e":"metro:instantiate","_t":1789631825207,"atlas":false,"workers":8,"host":"::","port":8082}
+{"_e":"root:init","_t":1789717285532,"format":"v0-jsonl","version":"57.0.24"}
+{"_e":"env:mode","_t":1789717285533,"nodeEnv":"development","babelEnv":"development","mode":"development"}
+{"_e":"env:load","_t":1789717285534,"mode":"development","files":[],"env":{}}
+{"_e":"devserver:start","_t":1789717285810,"mode":"development","web":true,"baseUrl":"","asyncRoutes":false,"routerRoot":"../../../app","serverComponents":false,"serverActions":false,"serverRendering":false,"apiRoutes":false,"exporting":false}
+{"_e":"metro:config","_t":1789717286045,"serverRoot":"../../..","projectRoot":"../../..","exporting":false,"flags":{"autolinkingModuleResolution":false,"serverActions":false,"serverComponents":false,"reactCompiler":false,"optimizeGraph":false,"treeshaking":false,"logbox":false}}
+{"_e":"expo:dev-tools-plugin:load","_t":1789717286179,"plugins":[]}
+{"_e":"metro:instantiate","_t":1789717286559,"atlas":false,"workers":6,"host":"::","port":8081}
+{"_e":"root:init","_t":1789717315846,"format":"v0-jsonl","version":"57.0.24"}
+{"_e":"env:mode","_t":1789717315846,"nodeEnv":"development","babelEnv":"development","mode":"development"}
+{"_e":"env:load","_t":1789717315847,"mode":"development","files":[],"env":{}}
+{"_e":"devserver:start","_t":1789717316059,"mode":"development","web":true,"baseUrl":"","asyncRoutes":false,"routerRoot":"../../../app","serverComponents":false,"serverActions":false,"serverRendering":false,"apiRoutes":false,"exporting":false}
+{"_e":"metro:config","_t":1789717316244,"serverRoot":"../../..","projectRoot":"../../..","exporting":false,"flags":{"autolinkingModuleResolution":false,"serverActions":false,"serverComponents":false,"reactCompiler":false,"optimizeGraph":false,"treeshaking":false,"logbox":false}}
+{"_e":"expo:dev-tools-plugin:load","_t":1789717316451,"plugins":[]}
+{"_e":"metro:instantiate","_t":1789717316797,"atlas":false,"workers":6,"host":"::","port":8081}
+{"_e":"metro:bundling:started","_t":1789717327779,"id":"1","platform":"ios","environment":null,"entry":"node_modules/expo/AppEntry.js"}
+{"_e":"metro:bundling:progress","_t":1789717327779,"id":"1","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1789717327781,"id":"1","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1789717327881,"id":"1","progress":0.05208243659716602,"total":241,"current":55}
+{"_e":"metro:bundling:progress","_t":1789717327981,"id":"1","progress":0.2780620736736985,"total":421,"current":222}
+{"_e":"metro:bundling:progress","_t":1789717328082,"id":"1","progress":0.6882062840541352,"total":622,"current":516}
+{"_e":"metro:bundling:progress","_t":1789717328182,"id":"1","progress":0.9051078662446128,"total":802,"current":763}
+{"_e":"metro:bundling:done","_t":1789717328256,"id":"1","total":802,"ms":476.543}
+{"_e":"metro:client_log","_t":1789717328633,"level":"warn","data":["expo-notifications: Android Push notifications (remote notifications) functionality provided by expo-notifications was removed from Expo Go with the release of SDK 53. Use a development build instead of Expo Go. Learn more at https://docs.expo.dev/develop/development-builds/introduction/."]}
+{"_e":"metro:client_log","_t":1789717328633,"level":"warn","data":["`expo-notifications` functionality is not fully supported in Expo Go:\nWe recommend you instead use a development build to avoid limitations. Learn more: https://expo.fyi/dev-client."]}
+{"_e":"metro:client_log","_t":1789717328647,"level":"warn","data":["SafeAreaView has been deprecated and will be removed in a future release. Please use 'react-native-safe-area-context' instead. See https://github.com/AppAndFlow/react-native-safe-area-context"]}
+{"_e":"root:init","_t":1789717528317,"format":"v0-jsonl","version":"57.0.24"}
+{"_e":"env:mode","_t":1789717528319,"nodeEnv":"development","babelEnv":"development","mode":"development"}
+{"_e":"env:load","_t":1789717528320,"mode":"development","files":[],"env":{}}
+{"_e":"devserver:start","_t":1789717529041,"mode":"development","web":true,"baseUrl":"","asyncRoutes":false,"routerRoot":"../../../app","serverComponents":false,"serverActions":false,"serverRendering":false,"apiRoutes":false,"exporting":false}
+{"_e":"metro:config","_t":1789717529347,"serverRoot":"../../..","projectRoot":"../../..","exporting":false,"flags":{"autolinkingModuleResolution":false,"serverActions":false,"serverComponents":false,"reactCompiler":false,"optimizeGraph":false,"treeshaking":false,"logbox":false}}
+{"_e":"expo:dev-tools-plugin:load","_t":1789717529538,"plugins":[]}
+{"_e":"metro:instantiate","_t":1789717530012,"atlas":false,"workers":6,"host":"::","port":8081}
+{"_e":"metro:bundling:started","_t":1789717535477,"id":"1","platform":"android","environment":null,"entry":"node_modules/expo/AppEntry.js"}
+{"_e":"metro:bundling:progress","_t":1789717535477,"id":"1","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1789717535480,"id":"1","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1789717535580,"id":"1","progress":0.0582639714625446,"total":174,"current":42}
+{"_e":"metro:bundling:progress","_t":1789717535680,"id":"1","progress":0.3315794793468251,"total":422,"current":243}
+{"_e":"metro:bundling:progress","_t":1789717535780,"id":"1","progress":0.75345924914324,"total":591,"current":513}
+{"_e":"metro:bundling:progress","_t":1789717535880,"id":"1","progress":0.8938335900314128,"total":678,"current":641}
+{"_e":"metro:bundling:progress","_t":1789717535981,"id":"1","progress":0.9971611086002066,"total":704,"current":703}
+{"_e":"metro:bundling:progress","_t":1789717536041,"id":"1","progress":0.999,"total":704,"current":704}
+{"_e":"metro:bundling:progress","_t":1789717536142,"id":"1","progress":0.999,"total":808,"current":766}
+{"_e":"metro:bundling:progress","_t":1789717536243,"id":"1","progress":0.999,"total":809,"current":768}
+{"_e":"metro:bundling:progress","_t":1789717536345,"id":"1","progress":0.999,"total":814,"current":773}
+{"_e":"metro:bundling:progress","_t":1789717536446,"id":"1","progress":0.999,"total":817,"current":779}
+{"_e":"metro:bundling:progress","_t":1789717536550,"id":"1","progress":0.999,"total":822,"current":786}
+{"_e":"metro:bundling:progress","_t":1789717536653,"id":"1","progress":0.999,"total":825,"current":790}
+{"_e":"metro:bundling:progress","_t":1789717536753,"id":"1","progress":0.999,"total":827,"current":797}
+{"_e":"metro:bundling:progress","_t":1789717536854,"id":"1","progress":0.999,"total":831,"current":819}
+{"_e":"metro:bundling:progress","_t":1789717536953,"id":"1","progress":0.999,"total":832,"current":828}
+{"_e":"metro:bundling:done","_t":1789717537068,"id":"1","total":832,"ms":1591.114625}
+{"_e":"metro:bundling:started","_t":1789717550091,"id":"2","platform":"android","environment":null,"entry":"node_modules/expo/AppEntry.js"}
+{"_e":"metro:bundling:progress","_t":1789717550091,"id":"2","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1789717550117,"id":"2","total":1,"ms":25.871291}
+{"_e":"root:init","_t":1789717624798,"format":"v0-jsonl","version":"57.0.24"}
+{"_e":"env:mode","_t":1789717624799,"nodeEnv":"development","babelEnv":"development","mode":"development"}
+{"_e":"env:load","_t":1789717624800,"mode":"development","files":[],"env":{}}
+{"_e":"devserver:start","_t":1789717625043,"mode":"development","web":true,"baseUrl":"","asyncRoutes":false,"routerRoot":"../../../app","serverComponents":false,"serverActions":false,"serverRendering":false,"apiRoutes":false,"exporting":false}
+{"_e":"metro:config","_t":1789717625254,"serverRoot":"../../..","projectRoot":"../../..","exporting":false,"flags":{"autolinkingModuleResolution":false,"serverActions":false,"serverComponents":false,"reactCompiler":false,"optimizeGraph":false,"treeshaking":false,"logbox":false}}
+{"_e":"expo:dev-tools-plugin:load","_t":1789717625373,"plugins":[]}
+{"_e":"metro:instantiate","_t":1789717625673,"atlas":false,"workers":6,"host":"::","port":8081}
+{"_e":"root:init","_t":1789717682695,"format":"v0-jsonl","version":"57.0.24"}
+{"_e":"env:mode","_t":1789717682695,"nodeEnv":"development","babelEnv":"development","mode":"development"}
+{"_e":"env:load","_t":1789717682696,"mode":"development","files":[],"env":{}}
+{"_e":"devserver:start","_t":1789717683062,"mode":"development","web":true,"baseUrl":"","asyncRoutes":false,"routerRoot":"../../../app","serverComponents":false,"serverActions":false,"serverRendering":false,"apiRoutes":false,"exporting":false}
+{"_e":"metro:config","_t":1789717683284,"serverRoot":"../../..","projectRoot":"../../..","exporting":false,"flags":{"autolinkingModuleResolution":false,"serverActions":false,"serverComponents":false,"reactCompiler":false,"optimizeGraph":false,"treeshaking":false,"logbox":false}}
+{"_e":"expo:dev-tools-plugin:load","_t":1789717683433,"plugins":[]}
+{"_e":"metro:instantiate","_t":1789717683815,"atlas":false,"workers":6,"host":"::","port":8081}
+{"_e":"metro:bundling:started","_t":1789717686640,"id":"1","platform":"ios","environment":null,"entry":"node_modules/expo/AppEntry.js"}
+{"_e":"metro:bundling:progress","_t":1789717686640,"id":"1","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1789717686642,"id":"1","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1789717686742,"id":"1","progress":0.0701854533303631,"total":268,"current":71}
+{"_e":"metro:bundling:progress","_t":1789717686842,"id":"1","progress":0.4396003994678186,"total":549,"current":364}
+{"_e":"metro:bundling:progress","_t":1789717686959,"id":"1","progress":0.8314698954191587,"total":692,"current":631}
+{"_e":"metro:bundling:progress","_t":1789717687059,"id":"1","progress":0.9108360535850307,"total":811,"current":774}
+{"_e":"metro:bundling:done","_t":1789717687113,"id":"1","total":811,"ms":472.666167}
+{"_e":"metro:client_log","_t":1789717687491,"level":"warn","data":["expo-notifications: Android Push notifications (remote notifications) functionality provided by expo-notifications was removed from Expo Go with the release of SDK 53. Use a development build instead of Expo Go. Learn more at https://docs.expo.dev/develop/development-builds/introduction/."]}
+{"_e":"metro:client_log","_t":1789717687492,"level":"warn","data":["`expo-notifications` functionality is not fully supported in Expo Go:\nWe recommend you instead use a development build to avoid limitations. Learn more: https://expo.fyi/dev-client."]}
+{"_e":"metro:client_log","_t":1789717687505,"level":"warn","data":["SafeAreaView has been deprecated and will be removed in a future release. Please use 'react-native-safe-area-context' instead. See https://github.com/AppAndFlow/react-native-safe-area-context"]}
+{"_e":"root:init","_t":1789717700079,"format":"v0-jsonl","version":"57.0.24"}
+{"_e":"env:mode","_t":1789717700080,"nodeEnv":"development","babelEnv":"development","mode":"development"}
+{"_e":"env:load","_t":1789717700081,"mode":"development","files":[],"env":{}}
+{"_e":"devserver:start","_t":1789717700297,"mode":"development","web":true,"baseUrl":"","asyncRoutes":false,"routerRoot":"../../../app","serverComponents":false,"serverActions":false,"serverRendering":false,"apiRoutes":false,"exporting":false}
+{"_e":"metro:config","_t":1789717700481,"serverRoot":"../../..","projectRoot":"../../..","exporting":false,"flags":{"autolinkingModuleResolution":false,"serverActions":false,"serverComponents":false,"reactCompiler":false,"optimizeGraph":false,"treeshaking":false,"logbox":false}}
+{"_e":"expo:dev-tools-plugin:load","_t":1789717700597,"plugins":[]}
+{"_e":"metro:instantiate","_t":1789717700867,"atlas":false,"workers":6,"host":"::","port":8081}
+{"_e":"metro:bundling:started","_t":1789717708956,"id":"1","platform":"ios","environment":null,"entry":"node_modules/expo/AppEntry.js"}
+{"_e":"metro:bundling:progress","_t":1789717708956,"id":"1","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1789717708958,"id":"1","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1789717709058,"id":"1","progress":0.11564579578047592,"total":297,"current":101}
+{"_e":"metro:bundling:progress","_t":1789717709158,"id":"1","progress":0.49841611287442966,"total":568,"current":401}
+{"_e":"metro:bundling:progress","_t":1789717709258,"id":"1","progress":0.825148707546394,"total":764,"current":694}
+{"_e":"metro:bundling:done","_t":1789717709359,"id":"1","total":764,"ms":402.860625}
+{"_e":"metro:client_log","_t":1789717709732,"level":"warn","data":["expo-notifications: Android Push notifications (remote notifications) functionality provided by expo-notifications was removed from Expo Go with the release of SDK 53. Use a development build instead of Expo Go. Learn more at https://docs.expo.dev/develop/development-builds/introduction/."]}
+{"_e":"metro:client_log","_t":1789717709733,"level":"warn","data":["`expo-notifications` functionality is not fully supported in Expo Go:\nWe recommend you instead use a development build to avoid limitations. Learn more: https://expo.fyi/dev-client."]}
+{"_e":"metro:client_log","_t":1789717709745,"level":"warn","data":["SafeAreaView has been deprecated and will be removed in a future release. Please use 'react-native-safe-area-context' instead. See https://github.com/AppAndFlow/react-native-safe-area-context"]}
+{"_e":"metro:bundling:started","_t":1789717725092,"id":"2","platform":"ios","environment":null,"entry":"node_modules/expo/AppEntry.js"}
+{"_e":"metro:bundling:progress","_t":1789717725092,"id":"2","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1789717725115,"id":"2","total":1,"ms":22.727875}
+{"_e":"metro:client_log","_t":1789717725453,"level":"warn","data":["expo-notifications: Android Push notifications (remote notifications) functionality provided by expo-notifications was removed from Expo Go with the release of SDK 53. Use a development build instead of Expo Go. Learn more at https://docs.expo.dev/develop/development-builds/introduction/."]}
+{"_e":"metro:client_log","_t":1789717725453,"level":"warn","data":["`expo-notifications` functionality is not fully supported in Expo Go:\nWe recommend you instead use a development build to avoid limitations. Learn more: https://expo.fyi/dev-client."]}
+{"_e":"metro:client_log","_t":1789717725469,"level":"warn","data":["SafeAreaView has been deprecated and will be removed in a future release. Please use 'react-native-safe-area-context' instead. See https://github.com/AppAndFlow/react-native-safe-area-context"]}
+{"_e":"root:init","_t":1789717778163,"format":"v0-jsonl","version":"57.0.24"}
+{"_e":"env:mode","_t":1789717778163,"nodeEnv":"development","babelEnv":"development","mode":"development"}
+{"_e":"env:load","_t":1789717778164,"mode":"development","files":[],"env":{}}
+{"_e":"devserver:start","_t":1789717778419,"mode":"development","web":true,"baseUrl":"","asyncRoutes":false,"routerRoot":"../../../app","serverComponents":false,"serverActions":false,"serverRendering":false,"apiRoutes":false,"exporting":false}
+{"_e":"metro:config","_t":1789717778626,"serverRoot":"../../..","projectRoot":"../../..","exporting":false,"flags":{"autolinkingModuleResolution":false,"serverActions":false,"serverComponents":false,"reactCompiler":false,"optimizeGraph":false,"treeshaking":false,"logbox":false}}
+{"_e":"expo:dev-tools-plugin:load","_t":1789717778749,"plugins":[]}
+{"_e":"metro:instantiate","_t":1789717779041,"atlas":false,"workers":6,"host":"::","port":8081}
+{"_e":"metro:bundling:started","_t":1789717785851,"id":"1","platform":"ios","environment":null,"entry":"node_modules/expo/AppEntry.js"}
+{"_e":"metro:bundling:progress","_t":1789717785852,"id":"1","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1789717785854,"id":"1","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1789717785954,"id":"1","progress":0.160513231426693,"total":312,"current":125}
+{"_e":"metro:bundling:progress","_t":1789717786054,"id":"1","progress":0.4396003994678186,"total":549,"current":364}
+{"_e":"metro:bundling:progress","_t":1789717786154,"id":"1","progress":0.8281000000000001,"total":700,"current":637}
+{"_e":"metro:bundling:progress","_t":1789717786254,"id":"1","progress":0.942389261187376,"total":821,"current":797}
+{"_e":"metro:bundling:done","_t":1789717786300,"id":"1","total":821,"ms":448.358125}
+{"_e":"metro:client_log","_t":1789717786657,"level":"warn","data":["expo-notifications: Android Push notifications (remote notifications) functionality provided by expo-notifications was removed from Expo Go with the release of SDK 53. Use a development build instead of Expo Go. Learn more at https://docs.expo.dev/develop/development-builds/introduction/."]}
+{"_e":"metro:client_log","_t":1789717786658,"level":"warn","data":["`expo-notifications` functionality is not fully supported in Expo Go:\nWe recommend you instead use a development build to avoid limitations. Learn more: https://expo.fyi/dev-client."]}
+{"_e":"metro:client_log","_t":1789717786675,"level":"warn","data":["SafeAreaView has been deprecated and will be removed in a future release. Please use 'react-native-safe-area-context' instead. See https://github.com/AppAndFlow/react-native-safe-area-context"]}
+{"_e":"root:init","_t":1789717977755,"format":"v0-jsonl","version":"57.0.24"}
+{"_e":"env:mode","_t":1789717977755,"nodeEnv":"development","babelEnv":"development","mode":"development"}
+{"_e":"env:load","_t":1789717977757,"mode":"development","files":["../../../.env.local"],"env":{"EXPO_PUBLIC_API_URL":"http://172.20.10.2:3000"}}
+{"_e":"root:init","_t":1789717991149,"format":"v0-jsonl","version":"57.0.24"}
+{"_e":"env:mode","_t":1789717991149,"nodeEnv":"development","babelEnv":"development","mode":"development"}
+{"_e":"env:load","_t":1789717991151,"mode":"development","files":["../../../.env.local"],"env":{"EXPO_PUBLIC_API_URL":"http://172.20.10.2:3000"}}
+{"_e":"devserver:start","_t":1789717991385,"mode":"development","web":true,"baseUrl":"","asyncRoutes":false,"routerRoot":"../../../app","serverComponents":false,"serverActions":false,"serverRendering":false,"apiRoutes":false,"exporting":false}
+{"_e":"metro:config","_t":1789717991601,"serverRoot":"../../..","projectRoot":"../../..","exporting":false,"flags":{"autolinkingModuleResolution":false,"serverActions":false,"serverComponents":false,"reactCompiler":false,"optimizeGraph":false,"treeshaking":false,"logbox":false}}
+{"_e":"expo:dev-tools-plugin:load","_t":1789717991735,"plugins":[]}
+{"_e":"metro:instantiate","_t":1789717992061,"atlas":false,"workers":6,"host":"::","port":8081}
+{"_e":"metro:bundling:started","_t":1789718002060,"id":"1","platform":"ios","environment":null,"entry":"node_modules/expo/AppEntry.js"}
+{"_e":"metro:bundling:progress","_t":1789718002061,"id":"1","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1789718002064,"id":"1","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1789718002163,"id":"1","progress":0.043264,"total":250,"current":52}
+{"_e":"metro:bundling:progress","_t":1789718002263,"id":"1","progress":0.3752127558175951,"total":542,"current":332}
+{"_e":"metro:bundling:progress","_t":1789718002373,"id":"1","progress":0.8038049940546969,"total":725,"current":650}
+{"_e":"metro:bundling:done","_t":1789718002477,"id":"1","total":725,"ms":416.836791}
+{"_e":"metro:client_log","_t":1789718002835,"level":"warn","data":["expo-notifications: Android Push notifications (remote notifications) functionality provided by expo-notifications was removed from Expo Go with the release of SDK 53. Use a development build instead of Expo Go. Learn more at https://docs.expo.dev/develop/development-builds/introduction/."]}
+{"_e":"metro:client_log","_t":1789718002836,"level":"warn","data":["`expo-notifications` functionality is not fully supported in Expo Go:\nWe recommend you instead use a development build to avoid limitations. Learn more: https://expo.fyi/dev-client."]}
+{"_e":"metro:client_log","_t":1789718002852,"level":"warn","data":["SafeAreaView has been deprecated and will be removed in a future release. Please use 'react-native-safe-area-context' instead. See https://github.com/AppAndFlow/react-native-safe-area-context"]}
+{"_e":"metro:bundling:started","_t":1789718725850,"id":"2","platform":"ios","environment":null,"entry":"node_modules/expo/AppEntry.js"}
+{"_e":"metro:bundling:progress","_t":1789718725850,"id":"2","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1789718725882,"id":"2","total":1,"ms":32.072167}
+{"_e":"metro:client_log","_t":1789718726231,"level":"warn","data":["expo-notifications: Android Push notifications (remote notifications) functionality provided by expo-notifications was removed from Expo Go with the release of SDK 53. Use a development build instead of Expo Go. Learn more at https://docs.expo.dev/develop/development-builds/introduction/."]}
+{"_e":"metro:client_log","_t":1789718726231,"level":"warn","data":["`expo-notifications` functionality is not fully supported in Expo Go:\nWe recommend you instead use a development build to avoid limitations. Learn more: https://expo.fyi/dev-client."]}
+{"_e":"metro:client_log","_t":1789718726248,"level":"warn","data":["SafeAreaView has been deprecated and will be removed in a future release. Please use 'react-native-safe-area-context' instead. See https://github.com/AppAndFlow/react-native-safe-area-context"]}
+{"_e":"metro:server_log","_t":1789719039923,"level":"error","data":["[timeout] connection terminated with Device for app='%s' on device='%s' after not responding for %s seconds.","host.exp.Exponent","iPhone","60"]}

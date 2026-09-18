@@ -7,7 +7,7 @@ import {
   PgDeviceRepository,
   PgEventRepository,
 } from './infrastructure/database';
-import { createMongoClient, initMongo, MongoMeasurementRepository } from './infrastructure/mongo';
+import { createMongoClient, initMongo, MongoMeasurementRepository, MongoRawEventRepository } from './infrastructure/mongo';
 import { FallbackMeasurementRepository } from './infrastructure/fallback';
 import { connectMqtt } from './infrastructure/mqtt';
 import { createHttpServer } from './infrastructure/http';
@@ -54,6 +54,7 @@ async function main(): Promise<void> {
   await mongoClient.connect();
   const mongoDB = await initMongo(mongoClient);
   const mongoMeasurements = new MongoMeasurementRepository(mongoDB);
+  const mongoRawEvents = new MongoRawEventRepository(mongoDB);
   logger.info('init.mongodb_connected');
 
   // Reads use PostgreSQL with automatic fallback to MongoDB when PG is unavailable
@@ -61,8 +62,8 @@ async function main(): Promise<void> {
 
   await seedDevices(deviceRepo);
 
-  // Write path: mongo first, then sync to postgres
-  const service = new TelemetryService(mongoMeasurements, pgMeasurements, deviceRepo, eventRepo);
+  // Write path: raw → mongo raw_events → mongo measurements → postgres
+  const service = new TelemetryService(mongoRawEvents, mongoMeasurements, pgMeasurements, deviceRepo, eventRepo);
 
   service.startSyncLoop(SYNC_INTERVAL_MS);
 

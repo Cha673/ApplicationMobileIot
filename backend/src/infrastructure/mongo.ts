@@ -1,6 +1,6 @@
-import { MongoClient, type Db } from 'mongodb';
-import type { SyncableMeasurementRepository } from '../domain/repositories';
-import type { Measurement } from '../domain/types';
+import { MongoClient, ObjectId, type Db, type WithId } from 'mongodb';
+import type { SyncableMeasurementRepository, RawEventRepository } from '../domain/repositories';
+import type { Measurement, RawEvent } from '../domain/types';
 
 interface MeasurementDoc {
   message_id: string;
@@ -20,10 +20,16 @@ export function createMongoClient(): MongoClient {
 
 export async function initMongo(client: MongoClient): Promise<Db> {
   const db = client.db();
-  const col = db.collection('measurements');
-  await col.createIndex({ message_id: 1 }, { unique: true });
-  await col.createIndex({ device_id: 1, observed_at: -1, received_at: -1, message_id: -1 });
-  await col.createIndex({ synced: 1 });
+
+  const measurements = db.collection('measurements');
+  await measurements.createIndex({ message_id: 1 }, { unique: true });
+  await measurements.createIndex({ device_id: 1, observed_at: -1, received_at: -1, message_id: -1 });
+  await measurements.createIndex({ synced: 1 });
+
+  const rawEvents = db.collection('raw_events');
+  await rawEvents.createIndex({ status: 1 });
+  await rawEvents.createIndex({ received_at: -1 });
+
   return db;
 }
 
@@ -105,6 +111,66 @@ export class MongoMeasurementRepository implements SyncableMeasurementRepository
       { $set: { synced: true } },
     );
   }
+}
+
+interface RawEventDoc {
+  topic: string;
+  payload: string;
+  received_at: string;
+  status: 'pending' | 'accepted' | 'rejected' | 'duplicate';
+  error?: string;
+  processed_at?: string;
+}
+
+export class MongoRawEventRepository implements RawEventRepository {
+  private readonly col;
+
+  constructor(db: Db) {
+    this.col = db.collection<RawEventDoc>('raw_events');
+  }
+
+  async save(topic: string, payload: string, receivedAt: string): Promise<string> {
+    const result = await this.col.insertOne({ topic, payload, received_at: receivedAt, status: 'pending' });
+    return result.insertedId.toString();
+  }
+
+  async findPending(limit: number): Promise<RawEvent[]> {
+    const docs = await this.col.find({ status: 'pending' }).limit(limit).toArray();
+    return docs.map(fromRawDoc);
+  }
+
+  async markAccepted(id: string, processedAt: string): Promise<void> {
+    await this.col.updateOne(
+      { _id: new ObjectId(id) },
+      { $set: { status: 'accepted', processed_at: processedAt } },
+    );
+  }
+
+  async markRejected(id: string, error: string, processedAt: string): Promise<void> {
+    await this.col.updateOne(
+      { _id: new ObjectId(id) },
+      { $set: { status: 'rejected', error, processed_at: processedAt } },
+    );
+  }
+
+  async markDuplicate(id: string, processedAt: string): Promise<void> {
+    await this.col.updateOne(
+      { _id: new ObjectId(id) },
+      { $set: { status: 'duplicate', processed_at: processedAt } },
+    );
+  }
+}
+
+function fromRawDoc(doc: WithId<RawEventDoc>): RawEvent {
+  return {
+    id: doc._id.toString(),
+    topic: doc.topic,
+    payload: doc.payload,
+    receivedAt: doc.received_at,
+    status: doc.status,
+    error: doc.error,
+    processedAt: doc.processed_at,
+  };
 }
 
 function toDoc(m: Measurement): MeasurementDoc {
