@@ -1,5 +1,11 @@
 import { z } from 'zod';
-import type { SyncableMeasurementRepository, MeasurementRepository, DeviceRepository, EventRepository } from '../domain/repositories';
+import type {
+  SyncableMeasurementRepository,
+  MeasurementRepository,
+  DeviceRepository,
+  EventRepository,
+  RawEventRepository,
+} from '../domain/repositories';
 import type { Measurement, RejectedEvent } from '../domain/types';
 import { logger } from '../infrastructure/logger';
 
@@ -7,48 +13,17 @@ const BATCH_SIZE = 500;
 
 export class TelemetryService {
   constructor(
+    private readonly rawEvents: RawEventRepository,
     private readonly rawMeasurements: SyncableMeasurementRepository,
     private readonly measurements: MeasurementRepository,
     private readonly devices: DeviceRepository,
     private readonly events: EventRepository,
   ) {}
 
-  async processTelemetry(raw: unknown, topic: string, eventId: string): Promise<void> {
-    const result = parseTelemetry(raw, topic, eventId);
-
-    if (!result.ok) {
-      logger.warn('telemetry.rejected', { ...result.rejection, status: 'rejected' });
-      await this.events.saveRejection(result.rejection).catch((err) =>
-        logger.warn('events.save_rejection_failed', { error: String(err) }),
-      );
-      return;
-    }
-
-    const msg = result.measurement;
-
-    if (await this.rawMeasurements.existsById(msg.messageId)) {
-      logger.warn('telemetry.duplicate', {
-        topic,
-        deviceId: msg.deviceId,
-        eventId: msg.messageId,
-        status: 'skipped',
-      });
-      await this.events.saveDuplicate({ topic, deviceId: msg.deviceId, messageId: msg.messageId }).catch((err) =>
-        logger.warn('events.save_duplicate_failed', { error: String(err) }),
-      );
-      return;
-    }
-
-    await this.rawMeasurements.save(msg);
-    await this.devices.updateTelemetrySeen(msg.deviceId, msg.receivedAt);
-    logger.info('telemetry.saved', {
-      topic,
-      deviceId: msg.deviceId,
-      eventId: msg.messageId,
-      temperature: msg.temperature,
-      co2: msg.co2,
-      status: 'accepted',
-    });
+  async saveRaw(topic: string, payload: string): Promise<void> {
+    const receivedAt = new Date().toISOString();
+    await this.rawEvents.save(topic, payload, receivedAt);
+    logger.info('mqtt.raw_stored', { topic });
   }
 
   async processAvailability(deviceId: string, status: 'online' | 'offline', topic: string): Promise<void> {
@@ -59,8 +34,68 @@ export class TelemetryService {
   startSyncLoop(intervalMs: number): void {
     logger.info('sync.started', { intervalMs, batchSize: BATCH_SIZE });
     setInterval(() => {
-      this.syncBatch().catch((err) => logger.warn('sync.unexpected_error', { error: String(err) }));
+      this.processRawBatch()
+        .then(() => this.syncBatch())
+        .catch((err) => logger.warn('sync.unexpected_error', { error: String(err) }));
     }, intervalMs);
+  }
+
+  private async processRawBatch(): Promise<void> {
+    const pending = await this.rawEvents.findPending(BATCH_SIZE);
+    if (pending.length === 0) return;
+
+    for (const event of pending) {
+      const processedAt = new Date().toISOString();
+      let data: Record<string, unknown>;
+      try {
+        data = JSON.parse(event.payload) as Record<string, unknown>;
+      } catch {
+        logger.error('raw.parse_error', { id: event.id, topic: event.topic, reason: 'invalid_json' });
+        await this.rawEvents.markRejected(event.id, 'invalid_json', processedAt);
+        await this.events.saveRejection({ topic: event.topic, reason: 'invalid_json' }).catch((err) =>
+          logger.warn('events.save_rejection_failed', { error: String(err) }),
+        );
+        continue;
+      }
+
+      const eventId = typeof data['message_id'] === 'string' && data['message_id']
+        ? data['message_id']
+        : event.id;
+
+      const result = parseTelemetry(data, event.topic, eventId);
+
+      if (!result.ok) {
+        logger.warn('raw.rejected', { ...result.rejection, status: 'rejected' });
+        await this.rawEvents.markRejected(event.id, result.rejection.reason, processedAt);
+        await this.events.saveRejection(result.rejection).catch((err) =>
+          logger.warn('events.save_rejection_failed', { error: String(err) }),
+        );
+        continue;
+      }
+
+      const msg = result.measurement;
+
+      if (await this.rawMeasurements.existsById(msg.messageId)) {
+        logger.warn('raw.duplicate', { topic: event.topic, deviceId: msg.deviceId, messageId: msg.messageId, status: 'skipped' });
+        await this.rawEvents.markDuplicate(event.id, processedAt);
+        await this.events.saveDuplicate({ topic: event.topic, deviceId: msg.deviceId, messageId: msg.messageId }).catch((err) =>
+          logger.warn('events.save_duplicate_failed', { error: String(err) }),
+        );
+        continue;
+      }
+
+      await this.rawMeasurements.save(msg);
+      await this.devices.updateTelemetrySeen(msg.deviceId, msg.receivedAt);
+      await this.rawEvents.markAccepted(event.id, processedAt);
+      logger.info('raw.accepted', {
+        topic: event.topic,
+        deviceId: msg.deviceId,
+        eventId: msg.messageId,
+        temperature: msg.temperature,
+        co2: msg.co2,
+        status: 'accepted',
+      });
+    }
   }
 
   private async syncBatch(): Promise<void> {
@@ -77,11 +112,9 @@ export class TelemetryService {
   }
 }
 
-// Physical bounds for sensor readings
-const TEMP_MIN = -50, TEMP_MAX = 100;   // °C — room/building sensor range
-const CO2_MIN = 0,    CO2_MAX = 5000;   // ppm — 0 impossible, 5000 dangerously high ceiling
+const TEMP_MIN = -50, TEMP_MAX = 100;
+const CO2_MIN = 0,    CO2_MAX = 5000;
 
-// Zod schema — structural and type checks only; physics range validated separately
 const TelemetrySchema = z.object({
   message_id:  z.string(),
   device_id:   z.string(),
