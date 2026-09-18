@@ -55,7 +55,7 @@ class Sensor:
         self.paused = self.no_response = False
         self.last = None
         self.client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id='campus-'+self.device.device_id, clean_session=True)
-        self.client.username_pw_set(os.getenv('MQTT_USER', 'simulator'), os.getenv('MQTT_PASSWORD', 'simulator-demo'))
+        self.client.username_pw_set(self.device.device_id, os.getenv('MQTT_PASSWORD', 'simulator-demo'))
         # L'heure du Will est inconnue lors de sa préparation : ne pas inventer un horodatage de panne.
         self.client.will_set(self.base+'availability', json.dumps({'schema_version': 1, 'device_id': self.device.device_id, 'status': 'offline', 'reason': 'connection_lost'}), qos=1, retain=True)
         self.client.reconnect_delay_set(1, 8)
