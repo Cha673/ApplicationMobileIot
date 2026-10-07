@@ -19,6 +19,7 @@ import {
   type Command,
   type CommandStatus,
   type LatestMeasurement,
+  type Alert,
 } from '../api';
 import { useAppStore } from '../store/useAppStore';
 
@@ -144,6 +145,8 @@ export function RoomDetailScreen(): React.ReactElement {
           {isOnline ? 'Capteur en ligne' : 'Capteur hors ligne'}
         </Text>
       </View>
+
+      {liveRoom.activeAlert && <AlertBanner alert={liveRoom.activeAlert} />}
 
       {/* Ventilation command section */}
       <View style={styles.ventilationCard}>
@@ -273,6 +276,20 @@ export function RoomDetailScreen(): React.ReactElement {
   );
 }
 
+function AlertBanner({ alert }: { alert: Alert }): React.ReactElement {
+  return (
+    <View style={styles.alertBanner}>
+      <Text style={styles.alertBannerTitle}>Alerte CO₂ élevé</Text>
+      <Text style={styles.alertBannerBody}>
+        Seuil dépassé à {Math.round(alert.triggeredValue)} ppm · depuis{' '}
+        {new Date(alert.triggeredAt).toLocaleString('fr-FR', {
+          day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+        })}
+      </Text>
+    </View>
+  );
+}
+
 function MeasureBlock({
   value, unit, label,
 }: { value: string; unit: string; label: string }): React.ReactElement {
@@ -304,6 +321,9 @@ const styles = StyleSheet.create({
   bannerOffline: { backgroundColor: '#fde8e8' },
   statusText: { textAlign: 'center', fontWeight: '500', color: '#444' },
 
+  alertBanner: { backgroundColor: '#fde8e8', borderRadius: 10, padding: 14, marginBottom: 16, borderLeftWidth: 4, borderLeftColor: '#e74c3c' },
+  alertBannerTitle: { fontSize: 14, fontWeight: '700', color: '#c0392b', marginBottom: 4 },
+  alertBannerBody: { fontSize: 13, color: '#555' },
   ventilationCard: { backgroundColor: '#fff', borderRadius: 12, padding: 16, marginBottom: 16, elevation: 2 },
   ventilationRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 },
   ventilationState: { flexDirection: 'row', alignItems: 'center', gap: 8 },
