@@ -21,6 +21,7 @@ export function connectMqtt(
   });
 
   client.on('connect', () => {
+    connected = true;
     logger.info('mqtt.connected', { host, port });
     client.subscribe(
       [
@@ -35,6 +36,8 @@ export function connectMqtt(
       },
     );
   });
+  client.on('close', () => { connected = false; });
+  client.on('offline', () => { connected = false; });
 
   client.on('message', (topic: string, payload: Buffer) => {
     handleMessage(topic, payload.toString(), ingestQueue, service, onResult).catch((err: unknown) =>

@@ -54,6 +54,45 @@ export class TelemetryService {
     }
 
     const msg = result.measurement;
+    const topicDeviceId = deviceIdFromTelemetryTopic(topic);
+    if (topicDeviceId === null) {
+      await rejectTelemetry(this.rawEvents, this.events, id, processedAt, topic, eventId, 'invalid_telemetry_topic');
+      return;
+    }
+
+    if (msg.deviceId !== topicDeviceId) {
+      await rejectTelemetry(
+        this.rawEvents,
+        this.events,
+        id,
+        processedAt,
+        topic,
+        eventId,
+        'device_identity_mismatch',
+        msg.deviceId,
+      );
+      return;
+    }
+
+    const registeredDevice = await this.devices.findById(topicDeviceId);
+    if (registeredDevice === null) {
+      await rejectTelemetry(this.rawEvents, this.events, id, processedAt, topic, eventId, 'unknown_device', topicDeviceId);
+      return;
+    }
+
+    if (msg.roomId !== registeredDevice.roomId) {
+      await rejectTelemetry(
+        this.rawEvents,
+        this.events,
+        id,
+        processedAt,
+        topic,
+        eventId,
+        'room_assignment_mismatch',
+        msg.roomId,
+      );
+      return;
+    }
 
     if (await this.rawMeasurements.existsById(msg.messageId)) {
       logger.warn('raw.duplicate', {
@@ -70,7 +109,7 @@ export class TelemetryService {
     }
 
     await this.rawMeasurements.save(msg);
-    await this.devices.updateTelemetrySeen(msg.deviceId, msg.receivedAt);
+    await this.devices.updateTelemetrySeen(msg.deviceId, msg.observedAt);
     await this.rawEvents.markAccepted(id, processedAt);
     logger.info('raw.accepted', {
       topic,
@@ -111,6 +150,23 @@ export class TelemetryService {
     await this.devices.updateVentilation(deviceId, ventilation);
     logger.info('state.updated', { topic, deviceId, ventilation });
   }
+}
+
+async function rejectTelemetry(
+  rawEvents: RawEventRepository,
+  events: EventRepository,
+  id: string,
+  processedAt: string,
+  topic: string,
+  eventId: string,
+  reason: string,
+  deviceId?: string,
+): Promise<void> {
+  await rawEvents.markRejected(id, reason, processedAt);
+  await events.saveRejection({ topic, eventId, deviceId, reason }).catch((err) =>
+    logger.warn('events.save_rejection_failed', { error: String(err) }),
+  );
+  logger.warn('raw.rejected', { topic, eventId, deviceId, reason, status: 'rejected' });
 }
 
 const TEMP_MIN = -50,
@@ -175,6 +231,18 @@ function parseTelemetry(raw: unknown, topic: string, eventId: string): ParseResu
         max: TEMP_MAX,
       },
     };
+  }
+
+  function deviceIdFromTelemetryTopic(topic: string): string | null {
+    const parts = topic.split('/');
+    return parts.length === 5 &&
+      parts[0] === 'campus' &&
+      parts[1] === 'v1' &&
+      parts[2] === 'devices' &&
+      parts[4] === 'telemetry' &&
+      parts[3].length > 0
+      ? parts[3]
+      : null;
   }
   if (co2Val < CO2_MIN || co2Val > CO2_MAX) {
     return {

@@ -109,6 +109,32 @@ async function main(): Promise<void> {
   commandService.startTimeoutChecker();
 
   const app = createHttpServer(deviceRepo, readMeasurements, commandService);
+
+  const isMqttConnected = connectMqtt(
+    MQTT_HOST, MQTT_PORT, MQTT_USER, MQTT_PASSWORD, ingestQueue, service,
+  );
+
+  const app = createHttpServer(deviceRepo, readMeasurements, {
+    postgres: () => pool.query('SELECT 1').then(() => undefined),
+    mongo: () => mongoDB.command({ ping: 1 }).then(() => undefined),
+    redis: async () => {
+      await ingestQueue.getJobCounts();
+      await syncQueue.getJobCounts();
+    },
+    mqtt: isMqttConnected,
+    sync: async () => {
+      const result = await mongoDB.collection('measurements').find(
+        { synced: false },
+        { projection: { received_at: 1 }, sort: { received_at: 1 }, limit: 1 },
+      ).toArray();
+      const count = await mongoDB.collection('measurements').countDocuments({ synced: false });
+      const oldest = result[0]?.['received_at'];
+      return {
+        unsyncedCount: count,
+        oldestUnsyncedAt: typeof oldest === 'string' ? oldest : null,
+      };
+    },
+  });
   app.listen(API_PORT, '0.0.0.0', () => {
     logger.info('http.listening', { port: API_PORT });
   });
