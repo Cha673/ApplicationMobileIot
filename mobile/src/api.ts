@@ -1,6 +1,21 @@
 const API_BASE = process.env["EXPO_PUBLIC_API_URL"] ?? "http://localhost:3000";
 export const ROOM_HISTORY_LIMIT = 50;
 
+export type CommandStatus = 'PENDING' | 'SENT' | 'ACKNOWLEDGED' | 'FAILED' | 'TIMEOUT';
+
+export interface Command {
+  commandId: string;
+  deviceId: string;
+  action: string;
+  params: Record<string, unknown>;
+  status: CommandStatus;
+  createdAt: string;
+  sentAt: string | null;
+  ackedAt: string | null;
+  expiresAt: string;
+  ackPayload: Record<string, unknown> | null;
+}
+
 export interface LatestMeasurement {
   temperature: number;
   co2: number;
@@ -31,6 +46,7 @@ export interface Room {
   lastSeenAt: string | null;
   lastTelemetryAt: string | null;
   latestMeasurement: LatestMeasurement | null;
+  ventilation: boolean;
 }
 
 export async function fetchRooms(): Promise<Room[]> {
@@ -57,4 +73,26 @@ export async function fetchYesterdayTemperatureAverage(
   );
   if (!res.ok) throw new Error(`Erreur HTTP ${res.status}`);
   return res.json() as Promise<DailyTemperatureAverage>;
+}
+
+export async function sendVentilationCommand(
+  roomId: string,
+  enabled: boolean,
+): Promise<Command> {
+  const res = await fetch(
+    `${API_BASE}/api/rooms/${encodeURIComponent(roomId)}/commands`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'set_ventilation', enabled }),
+    },
+  );
+  if (!res.ok) throw new Error(`Erreur HTTP ${res.status}`);
+  return res.json() as Promise<Command>;
+}
+
+export async function fetchCommandStatus(commandId: string): Promise<Command> {
+  const res = await fetch(`${API_BASE}/api/commands/${encodeURIComponent(commandId)}`);
+  if (!res.ok) throw new Error(`Erreur HTTP ${res.status}`);
+  return res.json() as Promise<Command>;
 }

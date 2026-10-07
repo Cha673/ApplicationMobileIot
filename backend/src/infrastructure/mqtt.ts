@@ -10,7 +10,8 @@ export function connectMqtt(
   password: string,
   ingestQueue: Queue,
   service: TelemetryService,
-): void {
+  onResult: (topic: string, payload: string) => Promise<void>,
+): mqtt.MqttClient {
   const client = mqtt.connect(`mqtt://${host}:${port}`, {
     username,
     password,
@@ -26,6 +27,7 @@ export function connectMqtt(
         'campus/v1/devices/+/telemetry',
         'campus/v1/devices/+/availability',
         'campus/v1/devices/+/state',
+        'campus/v1/devices/+/results',
       ],
       { qos: 1 },
       (err: Error | null) => {
@@ -35,13 +37,15 @@ export function connectMqtt(
   });
 
   client.on('message', (topic: string, payload: Buffer) => {
-    handleMessage(topic, payload.toString(), ingestQueue, service).catch((err: unknown) =>
+    handleMessage(topic, payload.toString(), ingestQueue, service, onResult).catch((err: unknown) =>
       logger.error('mqtt.handler_error', { topic, error: String(err) }),
     );
   });
 
   client.on('error', (err: Error) => logger.error('mqtt.error', { error: err.message }));
   client.on('reconnect', () => logger.warn('mqtt.reconnecting', { host, port }));
+
+  return client;
 }
 
 async function handleMessage(
@@ -49,9 +53,9 @@ async function handleMessage(
   payload: string,
   ingestQueue: Queue,
   service: TelemetryService,
+  onResult: (topic: string, payload: string) => Promise<void>,
 ): Promise<void> {
   if (topic.endsWith('/telemetry')) {
-    // Enqueue immediately — returns in microseconds, never blocks on MongoDB
     await ingestQueue.add('raw-telemetry', { topic, payload });
     logger.info('mqtt.enqueued', { topic });
   } else if (topic.endsWith('/availability')) {
@@ -62,8 +66,20 @@ async function handleMessage(
       logger.error('mqtt.parse_error', { topic, reason: 'invalid_json' });
       return;
     }
-    const deviceId = topic.split('/')[3];
+    const deviceId = topic.split('/')[3]!;
     const status = data['status'] === 'online' ? 'online' : 'offline';
     await service.processAvailability(deviceId, status, topic);
+  } else if (topic.endsWith('/state')) {
+    let data: Record<string, unknown>;
+    try {
+      data = JSON.parse(payload) as Record<string, unknown>;
+    } catch {
+      logger.warn('mqtt.parse_error', { topic, reason: 'invalid_json' });
+      return;
+    }
+    const deviceId = topic.split('/')[3]!;
+    await service.processState(deviceId, data['ventilation'] === true, topic);
+  } else if (topic.endsWith('/results')) {
+    await onResult(topic, payload);
   }
 }

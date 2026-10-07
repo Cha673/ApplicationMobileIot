@@ -6,6 +6,7 @@ export function startIngestWorker(
   redis: { host: string; port: number },
   service: TelemetryService,
   syncQueue: Queue,
+  concurrency = 20,
 ): Worker {
   const worker = new Worker(
     'ingest',
@@ -24,7 +25,7 @@ export function startIngestWorker(
     },
     {
       connection: redis,
-      concurrency: 5,
+      concurrency,
     },
   );
 

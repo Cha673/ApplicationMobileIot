@@ -15,6 +15,22 @@ export interface Device {
   isOnline: boolean;
   lastSeenAt: string | null;
   lastTelemetryAt: string | null;
+  ventilation: boolean;
+}
+
+export type CommandStatus = 'PENDING' | 'SENT' | 'ACKNOWLEDGED' | 'FAILED' | 'TIMEOUT';
+
+export interface Command {
+  commandId: string;
+  deviceId: string;
+  action: string;
+  params: Record<string, unknown>;
+  status: CommandStatus;
+  createdAt: string;
+  sentAt: string | null;
+  ackedAt: string | null;
+  expiresAt: string;
+  ackPayload: Record<string, unknown> | null;
 }
 
 export interface RejectedEvent {

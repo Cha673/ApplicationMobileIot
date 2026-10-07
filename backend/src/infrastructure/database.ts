@@ -1,6 +1,6 @@
 import { Pool } from 'pg';
-import type { MeasurementRepository, DeviceRepository, EventRepository } from '../domain/repositories';
-import type { Measurement, Device, RejectedEvent, DuplicateEvent } from '../domain/types';
+import type { MeasurementRepository, DeviceRepository, EventRepository, CommandRepository } from '../domain/repositories';
+import type { Measurement, Device, RejectedEvent, DuplicateEvent, Command, CommandStatus } from '../domain/types';
 
 export function createPool(): Pool {
   return new Pool({
@@ -62,11 +62,31 @@ export async function runMigrations(pool: Pool): Promise<void> {
 
     CREATE INDEX IF NOT EXISTS idx_duplicate_events_at
       ON duplicate_events (detected_at DESC);
+
+    CREATE TABLE IF NOT EXISTS commands (
+      command_id  TEXT PRIMARY KEY,
+      device_id   TEXT NOT NULL,
+      action      TEXT NOT NULL,
+      params      TEXT NOT NULL DEFAULT '{}',
+      status      TEXT NOT NULL DEFAULT 'PENDING',
+      created_at  TEXT NOT NULL,
+      sent_at     TEXT,
+      acked_at    TEXT,
+      expires_at  TEXT NOT NULL,
+      ack_payload TEXT
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_commands_device_created
+      ON commands (device_id, created_at DESC);
+
+    CREATE INDEX IF NOT EXISTS idx_commands_pending
+      ON commands (expires_at) WHERE status IN ('PENDING', 'SENT');
   `);
 
   // Additive column migrations (idempotent)
   await pool.query(`
     ALTER TABLE devices ADD COLUMN IF NOT EXISTS last_telemetry_at TEXT;
+    ALTER TABLE devices ADD COLUMN IF NOT EXISTS ventilation BOOLEAN NOT NULL DEFAULT false;
   `);
 }
 
@@ -160,6 +180,13 @@ export class PgDeviceRepository implements DeviceRepository {
     );
   }
 
+  async updateVentilation(deviceId: string, ventilation: boolean): Promise<void> {
+    await this.pool.query(
+      "UPDATE devices SET ventilation = $1 WHERE device_id = $2",
+      [ventilation, deviceId],
+    );
+  }
+
   async findAll(): Promise<Device[]> {
     const result = await this.pool.query("SELECT * FROM devices");
     return result.rows.map(toDevice);
@@ -209,11 +236,98 @@ function toMeasurement(r: Record<string, unknown>): Measurement {
 
 function toDevice(r: Record<string, unknown>): Device {
   return {
-    deviceId:       r["device_id"] as string,
-    roomId:         r["room_id"] as string,
-    label:          r["label"] as string,
-    isOnline:       r["is_online"] as boolean,
-    lastSeenAt:     r["last_seen_at"] as string | null,
+    deviceId:        r["device_id"] as string,
+    roomId:          r["room_id"] as string,
+    label:           r["label"] as string,
+    isOnline:        r["is_online"] as boolean,
+    lastSeenAt:      r["last_seen_at"] as string | null,
     lastTelemetryAt: r["last_telemetry_at"] as string | null,
+    ventilation:     (r["ventilation"] as boolean) ?? false,
+  };
+}
+
+export class PgCommandRepository implements CommandRepository {
+  constructor(private readonly pool: Pool) {}
+
+  async save(command: Command): Promise<void> {
+    await this.pool.query(
+      `INSERT INTO commands
+         (command_id, device_id, action, params, status, created_at, sent_at, acked_at, expires_at, ack_payload)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+      [
+        command.commandId, command.deviceId, command.action,
+        JSON.stringify(command.params), command.status,
+        command.createdAt, command.sentAt, command.ackedAt,
+        command.expiresAt,
+        command.ackPayload ? JSON.stringify(command.ackPayload) : null,
+      ],
+    );
+  }
+
+  async findById(commandId: string): Promise<Command | null> {
+    const result = await this.pool.query(
+      "SELECT * FROM commands WHERE command_id = $1",
+      [commandId],
+    );
+    return result.rows[0] ? toCommand(result.rows[0]) : null;
+  }
+
+  async markSent(commandId: string, sentAt: string): Promise<void> {
+    await this.pool.query(
+      "UPDATE commands SET status = 'SENT', sent_at = $1 WHERE command_id = $2",
+      [sentAt, commandId],
+    );
+  }
+
+  async markAcknowledged(commandId: string, ackedAt: string, ackPayload: Record<string, unknown>): Promise<void> {
+    await this.pool.query(
+      "UPDATE commands SET status = 'ACKNOWLEDGED', acked_at = $1, ack_payload = $2 WHERE command_id = $3",
+      [ackedAt, JSON.stringify(ackPayload), commandId],
+    );
+  }
+
+  async markFailed(commandId: string, ackedAt: string, ackPayload: Record<string, unknown>): Promise<void> {
+    await this.pool.query(
+      "UPDATE commands SET status = 'FAILED', acked_at = $1, ack_payload = $2 WHERE command_id = $3",
+      [ackedAt, JSON.stringify(ackPayload), commandId],
+    );
+  }
+
+  async markTimeout(commandId: string): Promise<void> {
+    await this.pool.query(
+      "UPDATE commands SET status = 'TIMEOUT' WHERE command_id = $1 AND status IN ('PENDING', 'SENT')",
+      [commandId],
+    );
+  }
+
+  async findExpiredPending(now: string): Promise<Command[]> {
+    const result = await this.pool.query(
+      "SELECT * FROM commands WHERE status IN ('PENDING', 'SENT') AND expires_at < $1",
+      [now],
+    );
+    return result.rows.map(toCommand);
+  }
+
+  async findByDevice(deviceId: string, limit: number): Promise<Command[]> {
+    const result = await this.pool.query(
+      "SELECT * FROM commands WHERE device_id = $1 ORDER BY created_at DESC LIMIT $2",
+      [deviceId, limit],
+    );
+    return result.rows.map(toCommand);
+  }
+}
+
+function toCommand(r: Record<string, unknown>): Command {
+  return {
+    commandId:  r["command_id"] as string,
+    deviceId:   r["device_id"] as string,
+    action:     r["action"] as string,
+    params:     JSON.parse(r["params"] as string) as Record<string, unknown>,
+    status:     r["status"] as CommandStatus,
+    createdAt:  r["created_at"] as string,
+    sentAt:     r["sent_at"] as string | null,
+    ackedAt:    r["acked_at"] as string | null,
+    expiresAt:  r["expires_at"] as string,
+    ackPayload: r["ack_payload"] ? JSON.parse(r["ack_payload"] as string) as Record<string, unknown> : null,
   };
 }
