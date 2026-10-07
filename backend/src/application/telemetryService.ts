@@ -206,6 +206,18 @@ function zodReasonFor(path: (string | number)[]): string {
   }
 }
 
+function deviceIdFromTelemetryTopic(topic: string): string | null {
+  const parts = topic.split('/');
+  return parts.length === 5 &&
+    parts[0] === 'campus' &&
+    parts[1] === 'v1' &&
+    parts[2] === 'devices' &&
+    parts[4] === 'telemetry' &&
+    parts[3].length > 0
+    ? parts[3]
+    : null;
+}
+
 function parseTelemetry(raw: unknown, topic: string, eventId: string): ParseResult {
   const result = TelemetrySchema.safeParse(raw);
   if (!result.success) {
@@ -233,17 +245,6 @@ function parseTelemetry(raw: unknown, topic: string, eventId: string): ParseResu
     };
   }
 
-  function deviceIdFromTelemetryTopic(topic: string): string | null {
-    const parts = topic.split('/');
-    return parts.length === 5 &&
-      parts[0] === 'campus' &&
-      parts[1] === 'v1' &&
-      parts[2] === 'devices' &&
-      parts[4] === 'telemetry' &&
-      parts[3].length > 0
-      ? parts[3]
-      : null;
-  }
   if (co2Val < CO2_MIN || co2Val > CO2_MAX) {
     return {
       ok: false,

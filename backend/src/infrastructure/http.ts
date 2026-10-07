@@ -53,6 +53,41 @@ function yesterdayRange(): { date: string; from: string; to: string } {
   };
 }
 
+async function getHealthStatus(health: HealthDependencies): Promise<Record<string, unknown>> {
+  const [postgres, mongo, redis, syncResult] = await Promise.all([
+    dependencyCheck(health.postgres),
+    dependencyCheck(health.mongo),
+    dependencyCheck(health.redis),
+    health.sync().then((value) => ({ status: 'up' as const, value })).catch(() => ({
+      status: 'down' as const,
+      value: { unsyncedCount: 0, oldestUnsyncedAt: null },
+    })),
+  ]);
+  const sync = syncResult.value;
+  const mqtt = health.mqtt() ? 'up' : 'down';
+  const syncLagMs = sync.oldestUnsyncedAt
+    ? Math.max(0, Date.now() - Date.parse(sync.oldestUnsyncedAt))
+    : 0;
+  const syncStatus = syncResult.status === 'down'
+    ? 'unavailable'
+    : syncLagMs > SYNC_LAG_THRESHOLD_MS ? 'blocked' : 'healthy';
+  const degraded = postgres === 'down' || mqtt === 'down' ||
+    syncStatus === 'blocked' || syncStatus === 'unavailable';
+  const down = mongo === 'down' || redis === 'down';
+
+  return {
+    status: down ? 'down' : degraded ? 'degraded' : 'ok',
+    timestamp: new Date().toISOString(),
+    dependencies: { postgres, mongo, redis, mqtt },
+    sync: {
+      status: syncStatus,
+      unsyncedCount: sync.unsyncedCount,
+      oldestUnsyncedAt: sync.oldestUnsyncedAt,
+      lagSeconds: Math.floor(syncLagMs / 1000),
+    },
+  };
+}
+
 export function createHttpServer(
   devices: DeviceRepository,
   measurements: MeasurementRepository,
@@ -88,6 +123,7 @@ export function createHttpServer(
         lastSeenAt: device.lastSeenAt,
         lastTelemetryAt: device.lastTelemetryAt,
         isStale: isStale(device.lastTelemetryAt),
+        ventilation: device.ventilation,
         latestMeasurement: await measurements.findLatestByDevice(device.deviceId),
       })),
     );
@@ -102,40 +138,6 @@ export function createHttpServer(
       return;
     }
 
-    async function getHealthStatus(health: HealthDependencies): Promise<Record<string, unknown>> {
-      const [postgres, mongo, redis, syncResult] = await Promise.all([
-        dependencyCheck(health.postgres),
-        dependencyCheck(health.mongo),
-        dependencyCheck(health.redis),
-        health.sync().then((value) => ({ status: 'up' as const, value })).catch(() => ({
-          status: 'down' as const,
-          value: { unsyncedCount: 0, oldestUnsyncedAt: null },
-        })),
-      ]);
-      const sync = syncResult.value;
-      const mqtt = health.mqtt() ? 'up' : 'down';
-      const syncLagMs = sync.oldestUnsyncedAt
-        ? Math.max(0, Date.now() - Date.parse(sync.oldestUnsyncedAt))
-        : 0;
-      const syncStatus = syncResult.status === 'down'
-        ? 'unavailable'
-        : syncLagMs > SYNC_LAG_THRESHOLD_MS ? 'blocked' : 'healthy';
-      const degraded = postgres === 'down' || mqtt === 'down' ||
-        syncStatus === 'blocked' || syncStatus === 'unavailable';
-      const down = mongo === 'down' || redis === 'down';
-
-      return {
-        status: down ? 'down' : degraded ? 'degraded' : 'ok',
-        timestamp: new Date().toISOString(),
-        dependencies: { postgres, mongo, redis, mqtt },
-        sync: {
-          status: syncStatus,
-          unsyncedCount: sync.unsyncedCount,
-          oldestUnsyncedAt: sync.oldestUnsyncedAt,
-          lagSeconds: Math.floor(syncLagMs / 1000),
-        },
-      };
-    }
     res.json({
       roomId: device.roomId,
       label: device.label || device.roomId,
@@ -144,6 +146,7 @@ export function createHttpServer(
       lastSeenAt: device.lastSeenAt,
       lastTelemetryAt: device.lastTelemetryAt,
       isStale: isStale(device.lastTelemetryAt),
+      ventilation: device.ventilation,
       latestMeasurement: await measurements.findLatestByDevice(device.deviceId),
     });
   });
