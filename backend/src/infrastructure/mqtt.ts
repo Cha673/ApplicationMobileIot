@@ -10,7 +10,8 @@ export function connectMqtt(
   password: string,
   ingestQueue: Queue,
   service: TelemetryService,
-): void {
+): () => boolean {
+  let connected = false;
   const client = mqtt.connect(`mqtt://${host}:${port}`, {
     username,
     password,
@@ -20,6 +21,7 @@ export function connectMqtt(
   });
 
   client.on('connect', () => {
+    connected = true;
     logger.info('mqtt.connected', { host, port });
     client.subscribe(
       [
@@ -33,6 +35,8 @@ export function connectMqtt(
       },
     );
   });
+  client.on('close', () => { connected = false; });
+  client.on('offline', () => { connected = false; });
 
   client.on('message', (topic: string, payload: Buffer) => {
     handleMessage(topic, payload.toString(), ingestQueue, service).catch((err: unknown) =>
@@ -42,6 +46,7 @@ export function connectMqtt(
 
   client.on('error', (err: Error) => logger.error('mqtt.error', { error: err.message }));
   client.on('reconnect', () => logger.warn('mqtt.reconnecting', { host, port }));
+  return () => connected;
 }
 
 async function handleMessage(

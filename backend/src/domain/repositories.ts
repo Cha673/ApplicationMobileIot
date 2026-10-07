@@ -25,7 +25,7 @@ export interface DeviceRepository {
     isOnline: boolean,
     lastSeenAt: string,
   ): Promise<void>;
-  updateTelemetrySeen(deviceId: string, receivedAt: string): Promise<void>;
+  updateTelemetrySeen(deviceId: string, observedAt: string): Promise<void>;
   findAll(): Promise<Device[]>;
   findById(deviceId: string): Promise<Device | null>;
 }

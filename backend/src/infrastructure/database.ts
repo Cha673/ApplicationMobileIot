@@ -153,10 +153,13 @@ export class PgDeviceRepository implements DeviceRepository {
     );
   }
 
-  async updateTelemetrySeen(deviceId: string, receivedAt: string): Promise<void> {
+  async updateTelemetrySeen(deviceId: string, observedAt: string): Promise<void> {
     await this.pool.query(
-      "UPDATE devices SET last_telemetry_at = $1 WHERE device_id = $2",
-      [receivedAt, deviceId],
+      `UPDATE devices
+       SET last_telemetry_at = $1
+       WHERE device_id = $2
+         AND (last_telemetry_at IS NULL OR last_telemetry_at < $1)`,
+      [observedAt, deviceId],
     );
   }
 
