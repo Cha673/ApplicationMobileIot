@@ -8,14 +8,12 @@ import {
   View,
 } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
-import { fetchRooms, fetchRoomHistory, fetchYesterdayTemperatureAverage, formatMeasurementTimestamp, ROOM_HISTORY_LIMIT, type LatestMeasurement, type Room } from '../api';
+import { fetchRooms, fetchRoomHistory, fetchYesterdayTemperatureAverage, formatMeasurementTimestamp, ROOM_HISTORY_LIMIT, type LatestMeasurement } from '../api';
+import { useAppStore } from '../store/useAppStore';
 
-interface Props {
-  room: Room;
-  onBack: () => void;
-}
-
-export function RoomDetailScreen({ room, onBack }: Props): React.ReactElement {
+export function RoomDetailScreen(): React.ReactElement {
+  const room = useAppStore((s) => s.selectedRoom)!;
+  const onBack = useAppStore((s) => s.clearRoom);
   const { data: rooms = [], isFetching: isRoomFetching, error: roomsError } = useQuery({
     queryKey: ['rooms'],
     queryFn: fetchRooms,
