@@ -1,4 +1,4 @@
-import type { Measurement, Device, RejectedEvent, DuplicateEvent, RawEvent } from './types';
+import type { Measurement, Device, RejectedEvent, DuplicateEvent, RawEvent, Command } from './types';
 
 export interface MeasurementRepository {
   save(measurement: Measurement): Promise<void>;
@@ -25,7 +25,8 @@ export interface DeviceRepository {
     isOnline: boolean,
     lastSeenAt: string,
   ): Promise<void>;
-  updateTelemetrySeen(deviceId: string, observedAt: string): Promise<void>;
+  updateTelemetrySeen(deviceId: string, receivedAt: string): Promise<void>;
+  updateVentilation(deviceId: string, ventilation: boolean): Promise<void>;
   findAll(): Promise<Device[]>;
   findById(deviceId: string): Promise<Device | null>;
 }
@@ -41,4 +42,15 @@ export interface RawEventRepository {
   markAccepted(id: string, processedAt: string): Promise<void>;
   markRejected(id: string, error: string, processedAt: string): Promise<void>;
   markDuplicate(id: string, processedAt: string): Promise<void>;
+}
+
+export interface CommandRepository {
+  save(command: Command): Promise<void>;
+  findById(commandId: string): Promise<Command | null>;
+  markSent(commandId: string, sentAt: string): Promise<void>;
+  markAcknowledged(commandId: string, ackedAt: string, ackPayload: Record<string, unknown>): Promise<void>;
+  markFailed(commandId: string, ackedAt: string, ackPayload: Record<string, unknown>): Promise<void>;
+  markTimeout(commandId: string): Promise<void>;
+  findExpiredPending(now: string): Promise<Command[]>;
+  findByDevice(deviceId: string, limit: number): Promise<Command[]>;
 }

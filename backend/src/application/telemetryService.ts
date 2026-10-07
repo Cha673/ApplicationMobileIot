@@ -9,7 +9,7 @@ import type {
 import type { Measurement, RejectedEvent } from '../domain/types';
 import { logger } from '../infrastructure/logger';
 
-const BATCH_SIZE = 500;
+const BATCH_SIZE = parseInt(process.env['SYNC_BATCH_SIZE'] ?? '1000', 10);
 
 export class TelemetryService {
   constructor(
@@ -144,6 +144,11 @@ export class TelemetryService {
   ): Promise<void> {
     await this.devices.updateStatus(deviceId, status === 'online', new Date().toISOString());
     logger.info('availability.updated', { topic, deviceId, status });
+  }
+
+  async processState(deviceId: string, ventilation: boolean, topic: string): Promise<void> {
+    await this.devices.updateVentilation(deviceId, ventilation);
+    logger.info('state.updated', { topic, deviceId, ventilation });
   }
 }
 

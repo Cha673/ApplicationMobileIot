@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   ActivityIndicator,
   ScrollView,
@@ -7,13 +7,46 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useQuery } from '@tanstack/react-query';
-import { fetchRooms, fetchRoomHistory, fetchYesterdayTemperatureAverage, formatMeasurementTimestamp, ROOM_HISTORY_LIMIT, type LatestMeasurement } from '../api';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  fetchRooms,
+  fetchRoomHistory,
+  fetchYesterdayTemperatureAverage,
+  fetchCommandStatus,
+  sendVentilationCommand,
+  formatMeasurementTimestamp,
+  ROOM_HISTORY_LIMIT,
+  type Command,
+  type CommandStatus,
+  type LatestMeasurement,
+} from '../api';
 import { useAppStore } from '../store/useAppStore';
+
+const TERMINAL_STATUSES: CommandStatus[] = ['ACKNOWLEDGED', 'FAILED', 'TIMEOUT'];
+
+const STATUS_LABEL: Record<CommandStatus, string> = {
+  PENDING:      'En attente…',
+  SENT:         'Envoyée…',
+  ACKNOWLEDGED: 'Confirmée',
+  FAILED:       'Rejetée',
+  TIMEOUT:      'Expirée (pas de réponse)',
+};
+
+const STATUS_COLOR: Record<CommandStatus, string> = {
+  PENDING:      '#f39c12',
+  SENT:         '#3498db',
+  ACKNOWLEDGED: '#27ae60',
+  FAILED:       '#e74c3c',
+  TIMEOUT:      '#95a5a6',
+};
 
 export function RoomDetailScreen(): React.ReactElement {
   const room = useAppStore((s) => s.selectedRoom)!;
   const onBack = useAppStore((s) => s.clearRoom);
+  const queryClient = useQueryClient();
+
+  const [activeCommandId, setActiveCommandId] = useState<string | null>(null);
+
   const { data: rooms = [], isFetching: isRoomFetching, error: roomsError } = useQuery({
     queryKey: ['rooms'],
     queryFn: fetchRooms,
@@ -26,10 +59,35 @@ export function RoomDetailScreen(): React.ReactElement {
     queryFn: () => fetchRoomHistory(room.roomId),
     refetchInterval: 10000,
   });
-  const { data: yesterdayAverage, error: averageError } = useQuery({
+
+  const { data: yesterdayAverage } = useQuery({
     queryKey: ["average-temperature-yesterday", room.roomId],
     queryFn: () => fetchYesterdayTemperatureAverage(room.roomId),
   });
+
+  const { data: activeCommand } = useQuery({
+    queryKey: ['command', activeCommandId],
+    queryFn: () => fetchCommandStatus(activeCommandId!),
+    enabled: !!activeCommandId,
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      if (status && TERMINAL_STATUSES.includes(status)) return false;
+      return 2000;
+    },
+  });
+
+  const ventilationMutation = useMutation({
+    mutationFn: (enabled: boolean) => sendVentilationCommand(room.roomId, enabled),
+    onSuccess: (command: Command) => {
+      setActiveCommandId(command.commandId);
+    },
+    onError: () => {
+      setActiveCommandId(null);
+    },
+  });
+
+  const isCommandInProgress =
+    !!activeCommandId && !!activeCommand && !TERMINAL_STATUSES.includes(activeCommand.status);
 
   const appOffline = roomsError !== null && rooms.length > 0;
   const isOnline = !appOffline && liveRoom.isOnline;
@@ -43,6 +101,17 @@ export function RoomDetailScreen(): React.ReactElement {
   const avgCo2 = history.length > 0
     ? history.reduce((sum, e) => sum + e.co2, 0) / history.length
     : null;
+
+  const handleVentilationToggle = () => {
+    if (isCommandInProgress || ventilationMutation.isPending) return;
+    const nextState = !liveRoom.ventilation;
+    // Invalidate rooms query once command is confirmed so ventilation state refreshes
+    if (activeCommand && TERMINAL_STATUSES.includes(activeCommand.status)) {
+      void queryClient.invalidateQueries({ queryKey: ['rooms'] });
+      setActiveCommandId(null);
+    }
+    ventilationMutation.mutate(nextState);
+  };
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -76,20 +145,80 @@ export function RoomDetailScreen(): React.ReactElement {
         </Text>
       </View>
 
+      {/* Ventilation command section */}
+      <View style={styles.ventilationCard}>
+        <Text style={styles.sectionTitle}>Ventilation</Text>
+
+        <View style={styles.ventilationRow}>
+          <View style={styles.ventilationState}>
+            <View style={[styles.ventilationDot, liveRoom.ventilation ? styles.dotOn : styles.dotOff]} />
+            <Text style={styles.ventilationStateText}>
+              {liveRoom.ventilation ? 'Active' : 'Inactive'}
+            </Text>
+          </View>
+
+          <TouchableOpacity
+            style={[
+              styles.ventilationBtn,
+              (isCommandInProgress || ventilationMutation.isPending) && styles.ventilationBtnDisabled,
+            ]}
+            onPress={handleVentilationToggle}
+            disabled={isCommandInProgress || ventilationMutation.isPending}
+          >
+            {(isCommandInProgress || ventilationMutation.isPending) ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Text style={styles.ventilationBtnText}>
+                {liveRoom.ventilation ? 'Désactiver' : 'Activer'}
+              </Text>
+            )}
+          </TouchableOpacity>
+        </View>
+
+        {activeCommand && (
+          <View style={[styles.commandStatus, { borderLeftColor: STATUS_COLOR[activeCommand.status] }]}>
+            <Text style={[styles.commandStatusText, { color: STATUS_COLOR[activeCommand.status] }]}>
+              {STATUS_LABEL[activeCommand.status]}
+            </Text>
+            <Text style={styles.commandId}>
+              ID : {activeCommand.commandId.slice(0, 8)}…
+            </Text>
+            {activeCommand.status === 'ACKNOWLEDGED' && activeCommand.ackPayload && (
+              <Text style={styles.commandDetail}>
+                Ventilation : {(activeCommand.ackPayload as { ventilation?: boolean })['ventilation'] ? 'activée' : 'désactivée'}
+              </Text>
+            )}
+            {activeCommand.status === 'FAILED' && activeCommand.ackPayload && (
+              <Text style={styles.commandDetail}>
+                Raison : {String((activeCommand.ackPayload as Record<string, unknown>)['reason'] ?? 'inconnue')}
+              </Text>
+            )}
+            {TERMINAL_STATUSES.includes(activeCommand.status) && (
+              <TouchableOpacity onPress={() => { setActiveCommandId(null); void queryClient.invalidateQueries({ queryKey: ['rooms'] }); }}>
+                <Text style={styles.dismissText}>Fermer</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+
+        {ventilationMutation.isError && (
+          <View style={styles.errorBox}>
+            <Text style={styles.errorBoxTitle}>Erreur réseau</Text>
+            <Text style={styles.errorBoxDetail}>
+              {ventilationMutation.error instanceof Error
+                ? ventilationMutation.error.message
+                : 'Erreur inconnue'}
+            </Text>
+          </View>
+        )}
+      </View>
+
       {m ? (
         <View style={styles.latest}>
           <Text style={styles.sectionTitle}>Dernière mesure</Text>
           <View style={styles.measures}>
-            <MeasureBlock
-              value={`${m.temperature.toFixed(1)}`}
-              unit="°C"
-              label="Température"
-            />
-            <MeasureBlock
-              value={`${Math.round(m.co2)}`}
-              unit="ppm"
-              label="CO₂"
-            />
+            <MeasureBlock value={`${m.temperature.toFixed(1)}`} unit="°C" label="Température" />
+            <MeasureBlock value={`${Math.round(m.co2)}`} unit="ppm" label="CO₂" />
           </View>
           <Text style={styles.observedAt}>
             Donnée du {formatMeasurementTimestamp(m.observedAt)}
@@ -97,9 +226,7 @@ export function RoomDetailScreen(): React.ReactElement {
         </View>
       ) : (
         <View style={styles.noDataBox}>
-          <Text style={styles.noDataText}>
-            Aucune mesure disponible pour cette salle
-          </Text>
+          <Text style={styles.noDataText}>Aucune mesure disponible pour cette salle</Text>
         </View>
       )}
 
@@ -113,22 +240,17 @@ export function RoomDetailScreen(): React.ReactElement {
         </View>
       )}
 
-      <Text style={styles.sectionTitle}>Historique (50 dernières mesures)</Text>
-
       <Text style={styles.sectionTitle}>
         {ROOM_HISTORY_LIMIT} dernières valeurs mesurées
       </Text>
 
-      {isLoading && (
-        <ActivityIndicator color="#4285F4" style={{ marginTop: 16 }} />
-      )}
+      {isLoading && <ActivityIndicator color="#4285F4" style={{ marginTop: 16 }} />}
 
       {error && history.length === 0 && (
         <View style={styles.errorBox}>
           <Text style={styles.errorBoxTitle}>Historique non disponible hors ligne</Text>
           <Text style={styles.errorBoxBody}>
             Cet historique n'a jamais été téléchargé et ne se trouve pas dans le cache.
-            Ouvrez cette salle une fois connecté à Internet pour le mettre en cache.
           </Text>
           <Text style={styles.errorBoxDetail}>
             {error instanceof Error ? error.message : 'Erreur inconnue'}
@@ -142,12 +264,8 @@ export function RoomDetailScreen(): React.ReactElement {
 
       {history.map((entry, index) => (
         <View key={index} style={styles.historyRow}>
-          <Text style={styles.historyTime}>
-            {formatMeasurementTimestamp(entry.observedAt)}
-          </Text>
-          <Text style={styles.historyValue}>
-            {entry.temperature.toFixed(1)} °C
-          </Text>
+          <Text style={styles.historyTime}>{formatMeasurementTimestamp(entry.observedAt)}</Text>
+          <Text style={styles.historyValue}>{entry.temperature.toFixed(1)} °C</Text>
           <Text style={styles.historyValue}>{Math.round(entry.co2)} ppm</Text>
         </View>
       ))}
@@ -156,14 +274,8 @@ export function RoomDetailScreen(): React.ReactElement {
 }
 
 function MeasureBlock({
-  value,
-  unit,
-  label,
-}: {
-  value: string;
-  unit: string;
-  label: string;
-}): React.ReactElement {
+  value, unit, label,
+}: { value: string; unit: string; label: string }): React.ReactElement {
   return (
     <View style={styles.measureBlock}>
       <View style={styles.measureRow}>
@@ -183,25 +295,31 @@ const styles = StyleSheet.create({
   backText: { color: '#4285F4', fontSize: 16 },
   updatingRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   updatingText: { fontSize: 12, color: '#4285F4' },
-  offlineBanner: {
-    backgroundColor: "#f39c12",
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    marginBottom: 12,
-  },
-  offlineText: {
-    color: "#fff",
-    fontSize: 12,
-    fontWeight: "600",
-    textAlign: "center",
-  },
+  offlineBanner: { backgroundColor: "#f39c12", paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8, marginBottom: 12 },
+  offlineText: { color: "#fff", fontSize: 12, fontWeight: "600", textAlign: "center" },
   title: { fontSize: 24, fontWeight: "700", color: "#1a1a1a", marginBottom: 4 },
   deviceId: { fontSize: 13, color: "#888", marginBottom: 12 },
   statusBanner: { padding: 10, borderRadius: 8, marginBottom: 16 },
   bannerOnline: { backgroundColor: '#e8f5e9' },
   bannerOffline: { backgroundColor: '#fde8e8' },
   statusText: { textAlign: 'center', fontWeight: '500', color: '#444' },
+
+  ventilationCard: { backgroundColor: '#fff', borderRadius: 12, padding: 16, marginBottom: 16, elevation: 2 },
+  ventilationRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 },
+  ventilationState: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  ventilationDot: { width: 12, height: 12, borderRadius: 6 },
+  dotOn: { backgroundColor: '#27ae60' },
+  dotOff: { backgroundColor: '#bbb' },
+  ventilationStateText: { fontSize: 15, color: '#444' },
+  ventilationBtn: { backgroundColor: '#4285F4', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8, minWidth: 110, alignItems: 'center' },
+  ventilationBtnDisabled: { backgroundColor: '#aaa' },
+  ventilationBtnText: { color: '#fff', fontWeight: '600', fontSize: 14 },
+  commandStatus: { marginTop: 12, padding: 10, borderLeftWidth: 4, borderRadius: 4, backgroundColor: '#f9f9f9' },
+  commandStatusText: { fontWeight: '600', fontSize: 13 },
+  commandId: { fontSize: 11, color: '#999', marginTop: 2 },
+  commandDetail: { fontSize: 12, color: '#555', marginTop: 4 },
+  dismissText: { fontSize: 12, color: '#4285F4', marginTop: 8 },
+
   latest: { backgroundColor: '#fff', borderRadius: 12, padding: 16, marginBottom: 16, elevation: 2 },
   sectionTitle: { fontSize: 15, fontWeight: '600', color: '#555', marginBottom: 10 },
   measures: { flexDirection: 'row', justifyContent: 'space-around', marginBottom: 8 },
@@ -213,27 +331,12 @@ const styles = StyleSheet.create({
   observedAt: { fontSize: 12, color: '#aaa', textAlign: 'center', marginTop: 4 },
   noDataBox: { backgroundColor: '#fff', borderRadius: 12, padding: 20, marginBottom: 16, alignItems: 'center' },
   noDataText: { color: '#bbb', fontStyle: 'italic' },
-  errorBox: {
-    backgroundColor: '#fde8e8',
-    borderRadius: 10,
-    padding: 16,
-    marginTop: 8,
-    borderLeftWidth: 4,
-    borderLeftColor: '#c0392b',
-  },
+  errorBox: { backgroundColor: '#fde8e8', borderRadius: 10, padding: 16, marginTop: 8, borderLeftWidth: 4, borderLeftColor: '#c0392b' },
   errorBoxTitle: { fontSize: 14, fontWeight: '700', color: '#c0392b', marginBottom: 6 },
   errorBoxBody: { fontSize: 13, color: '#555', lineHeight: 19, marginBottom: 8 },
   errorBoxDetail: { fontSize: 11, color: '#999', fontStyle: 'italic' },
   emptyText: { color: '#aaa', fontStyle: 'italic', marginTop: 8 },
-  historyRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    backgroundColor: "#fff",
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
-    marginBottom: 4,
-  },
+  historyRow: { flexDirection: "row", justifyContent: "space-between", backgroundColor: "#fff", paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8, marginBottom: 4 },
   historyTime: { color: "#666", fontSize: 13 },
   historyValue: { color: "#1a1a1a", fontSize: 13, fontWeight: "500" },
 });

@@ -1,5 +1,6 @@
 import express from 'express';
 import type { DeviceRepository, MeasurementRepository } from '../domain/repositories';
+import type { CommandService } from '../application/commandService';
 
 const HISTORY_LIMIT = 50;
 const FRESHNESS_THRESHOLD_MS = Number(process.env['FRESHNESS_THRESHOLD_MS'] ?? 10000);
@@ -55,7 +56,9 @@ function yesterdayRange(): { date: string; from: string; to: string } {
 export function createHttpServer(
   devices: DeviceRepository,
   measurements: MeasurementRepository,
+  commandService: CommandService,
   health: HealthDependencies,
+
 ): express.Application {
   const app = express();
   app.use(express.json());
@@ -174,6 +177,42 @@ export function createHttpServer(
 
   app.get('/api/devices', async (_req, res) => {
     res.json(await devices.findAll());
+  });
+
+  app.post('/api/rooms/:roomId/commands', async (req, res) => {
+    const allDevices = await devices.findAll();
+    const device = allDevices.find((d) => d.roomId === req.params['roomId']);
+    if (!device) {
+      res.status(404).json({ error: 'Room not found' });
+      return;
+    }
+    const body = req.body as Record<string, unknown>;
+    const { action, ...params } = body;
+    if (typeof action !== 'string') {
+      res.status(400).json({ error: 'action is required' });
+      return;
+    }
+    const command = await commandService.sendCommand(device.deviceId, action, params);
+    res.status(201).json(command);
+  });
+
+  app.get('/api/rooms/:roomId/commands', async (req, res) => {
+    const allDevices = await devices.findAll();
+    const device = allDevices.find((d) => d.roomId === req.params['roomId']);
+    if (!device) {
+      res.status(404).json({ error: 'Room not found' });
+      return;
+    }
+    res.json(await commandService.getCommandsByDevice(device.deviceId, 20));
+  });
+
+  app.get('/api/commands/:commandId', async (req, res) => {
+    const command = await commandService.getCommand(req.params['commandId']!);
+    if (!command) {
+      res.status(404).json({ error: 'Command not found' });
+      return;
+    }
+    res.json(command);
   });
 
   return app;
