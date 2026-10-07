@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import * as Notifications from 'expo-notifications';
 import { SafeAreaView, StatusBar, StyleSheet, Text, View } from 'react-native';
 import { QueryClient } from '@tanstack/react-query';
@@ -7,7 +7,7 @@ import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persi
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { RoomsScreen } from './src/screens/RoomsScreen';
 import { RoomDetailScreen } from './src/screens/RoomDetailScreen';
-import type { Room } from './src/api';
+import { useAppStore } from './src/store/useAppStore';
 import {
   configureNotifications,
   registerForPushNotificationsAsync,
@@ -29,7 +29,7 @@ const persister = createAsyncStoragePersister({
 });
 
 export default function App(): React.ReactElement {
-  const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
+  const selectedRoom = useAppStore((s) => s.selectedRoom);
 
   useEffect(() => {
     configureNotifications();
@@ -63,12 +63,9 @@ export default function App(): React.ReactElement {
         </View>
         <View style={styles.body}>
           {selectedRoom ? (
-            <RoomDetailScreen
-              room={selectedRoom}
-              onBack={() => setSelectedRoom(null)}
-            />
+            <RoomDetailScreen />
           ) : (
-            <RoomsScreen onSelectRoom={setSelectedRoom} />
+            <RoomsScreen />
           )}
         </View>
       </SafeAreaView>

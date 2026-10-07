@@ -1,4 +1,5 @@
 import mqtt from 'mqtt';
+import type { Queue } from 'bullmq';
 import type { TelemetryService } from '../application/telemetryService';
 import { logger } from './logger';
 
@@ -7,6 +8,7 @@ export function connectMqtt(
   port: number,
   username: string,
   password: string,
+  ingestQueue: Queue,
   service: TelemetryService,
 ): void {
   const client = mqtt.connect(`mqtt://${host}:${port}`, {
@@ -33,7 +35,7 @@ export function connectMqtt(
   });
 
   client.on('message', (topic: string, payload: Buffer) => {
-    handleMessage(topic, payload.toString(), service).catch((err: unknown) =>
+    handleMessage(topic, payload.toString(), ingestQueue, service).catch((err: unknown) =>
       logger.error('mqtt.handler_error', { topic, error: String(err) }),
     );
   });
@@ -45,10 +47,13 @@ export function connectMqtt(
 async function handleMessage(
   topic: string,
   payload: string,
+  ingestQueue: Queue,
   service: TelemetryService,
 ): Promise<void> {
   if (topic.endsWith('/telemetry')) {
-    await service.saveRaw(topic, payload);
+    // Enqueue immediately — returns in microseconds, never blocks on MongoDB
+    await ingestQueue.add('raw-telemetry', { topic, payload });
+    logger.info('mqtt.enqueued', { topic });
   } else if (topic.endsWith('/availability')) {
     let data: Record<string, unknown>;
     try {

@@ -11,12 +11,10 @@ import {
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchRooms, formatMeasurementTimestamp, type Room } from "../api";
 import { showDataUpdatedNotification } from "../notifications";
+import { useAppStore } from "../store/useAppStore";
 
-interface Props {
-  onSelectRoom: (room: Room) => void;
-}
-
-export function RoomsScreen({ onSelectRoom }: Props): React.ReactElement {
+export function RoomsScreen(): React.ReactElement {
+  const selectRoom = useAppStore((s) => s.selectRoom);
   const queryClient = useQueryClient();
 
   const {
@@ -120,7 +118,7 @@ export function RoomsScreen({ onSelectRoom }: Props): React.ReactElement {
         keyExtractor={(item) => item.roomId}
         renderItem={({ item }) => (
           <TouchableOpacity
-            onPress={() => onSelectRoom(item)}
+            onPress={() => selectRoom(item)}
             activeOpacity={0.8}
           >
             <RoomRow room={item} appOffline={offline} />

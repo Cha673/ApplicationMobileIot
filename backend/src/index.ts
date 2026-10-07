@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { Queue } from 'bullmq';
 import {
   createPool,
   runMigrations,
@@ -12,15 +13,18 @@ import { FallbackMeasurementRepository } from './infrastructure/fallback';
 import { connectMqtt } from './infrastructure/mqtt';
 import { createHttpServer } from './infrastructure/http';
 import { TelemetryService } from './application/telemetryService';
+import { startIngestWorker } from './workers/ingestWorker';
+import { startSyncWorker } from './workers/syncWorker';
 import { logger } from './infrastructure/logger';
 
-const MQTT_HOST = process.env['MQTT_HOST'] ?? 'localhost';
-const MQTT_PORT = parseInt(process.env['MQTT_PORT'] ?? '1883', 10);
-const MQTT_USER = process.env['MQTT_USER'] ?? 'backend';
+const MQTT_HOST     = process.env['MQTT_HOST']     ?? 'localhost';
+const MQTT_PORT     = parseInt(process.env['MQTT_PORT']     ?? '1883', 10);
+const MQTT_USER     = process.env['MQTT_USER']     ?? 'backend';
 const MQTT_PASSWORD = process.env['MQTT_PASSWORD'] ?? 'backend-demo';
-const API_PORT = parseInt(process.env['API_PORT'] ?? '3000', 10);
-const DEVICES_PATH = process.env['DEVICES_PATH'] ?? path.join(process.cwd(), 'devices.json');
-const SYNC_INTERVAL_MS = parseInt(process.env['SYNC_INTERVAL_MS'] ?? '5000', 10);
+const API_PORT      = parseInt(process.env['API_PORT']      ?? '3000', 10);
+const DEVICES_PATH  = process.env['DEVICES_PATH']  ?? path.join(process.cwd(), 'devices.json');
+const REDIS_HOST    = process.env['REDIS_HOST']    ?? 'localhost';
+const REDIS_PORT    = parseInt(process.env['REDIS_PORT']    ?? '6379', 10);
 
 interface DeviceConfig {
   device_id: string;
@@ -42,32 +46,40 @@ async function seedDevices(repo: PgDeviceRepository): Promise<void> {
 }
 
 async function main(): Promise<void> {
-  // Relational DB (PostgreSQL) — source of truth for validated reads
   const pool = createPool();
   await runMigrations(pool);
   const pgMeasurements = new PgMeasurementRepository(pool);
-  const deviceRepo = new PgDeviceRepository(pool);
-  const eventRepo = new PgEventRepository(pool);
+  const deviceRepo     = new PgDeviceRepository(pool);
+  const eventRepo      = new PgEventRepository(pool);
 
-  // Non-relational DB (MongoDB) — raw ingest and offline cache
   const mongoClient = createMongoClient();
   await mongoClient.connect();
-  const mongoDB = await initMongo(mongoClient);
+  const mongoDB          = await initMongo(mongoClient);
   const mongoMeasurements = new MongoMeasurementRepository(mongoDB);
-  const mongoRawEvents = new MongoRawEventRepository(mongoDB);
+  const mongoRawEvents    = new MongoRawEventRepository(mongoDB);
   logger.info('init.mongodb_connected');
 
-  // Reads use PostgreSQL with automatic fallback to MongoDB when PG is unavailable
   const readMeasurements = new FallbackMeasurementRepository(pgMeasurements, mongoMeasurements);
 
   await seedDevices(deviceRepo);
 
-  // Write path: raw → mongo raw_events → mongo measurements → postgres
   const service = new TelemetryService(mongoRawEvents, mongoMeasurements, pgMeasurements, deviceRepo, eventRepo);
 
-  service.startSyncLoop(SYNC_INTERVAL_MS);
+  // Redis connection config partagée par les deux queues et les deux workers
+  const redis = { host: REDIS_HOST, port: REDIS_PORT };
 
-  connectMqtt(MQTT_HOST, MQTT_PORT, MQTT_USER, MQTT_PASSWORD, service);
+  // Queue 1 : MQTT → MongoDB (réception + validation)
+  const ingestQueue = new Queue('ingest', { connection: redis });
+
+  // Queue 2 : MongoDB → PostgreSQL (synchronisation)
+  const syncQueue = new Queue('sync', { connection: redis });
+
+  startIngestWorker(redis, service, syncQueue);
+  startSyncWorker(redis, service);
+
+  logger.info('workers.started', { redis: `${REDIS_HOST}:${REDIS_PORT}` });
+
+  connectMqtt(MQTT_HOST, MQTT_PORT, MQTT_USER, MQTT_PASSWORD, ingestQueue, service);
 
   const app = createHttpServer(deviceRepo, readMeasurements);
   app.listen(API_PORT, '0.0.0.0', () => {
