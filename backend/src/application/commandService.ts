@@ -93,7 +93,15 @@ export class CommandService {
       ackStatus: data['status'],
     });
 
-    if (command.status === 'TIMEOUT') {
+    const alreadyExpired =
+      command.status === 'TIMEOUT' ||
+      ((command.status === 'PENDING' || command.status === 'SENT') &&
+        new Date(command.expiresAt) < new Date());
+
+    if (alreadyExpired) {
+      if (command.status !== 'TIMEOUT') {
+        await this.commands.markTimeout(commandId);
+      }
       logger.warn('command.ack_after_timeout', {
         commandId,
         deviceId: command.deviceId,

@@ -12,6 +12,7 @@ export function connectMqtt(
   service: TelemetryService,
   onResult: (topic: string, payload: string) => Promise<void>,
 ): mqtt.MqttClient {
+  let connected = false;
   const client = mqtt.connect(`mqtt://${host}:${port}`, {
     username,
     password,

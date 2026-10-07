@@ -108,20 +108,14 @@ async function main(): Promise<void> {
   handleAck = (topic, payload) => commandService.handleAck(topic, payload);
   commandService.startTimeoutChecker();
 
-  const app = createHttpServer(deviceRepo, readMeasurements, commandService);
-
-  const isMqttConnected = connectMqtt(
-    MQTT_HOST, MQTT_PORT, MQTT_USER, MQTT_PASSWORD, ingestQueue, service,
-  );
-
-  const app = createHttpServer(deviceRepo, readMeasurements, {
+  const app = createHttpServer(deviceRepo, readMeasurements, commandService, {
     postgres: () => pool.query('SELECT 1').then(() => undefined),
     mongo: () => mongoDB.command({ ping: 1 }).then(() => undefined),
     redis: async () => {
       await ingestQueue.getJobCounts();
       await syncQueue.getJobCounts();
     },
-    mqtt: isMqttConnected,
+    mqtt: () => mqttClient.connected,
     sync: async () => {
       const result = await mongoDB.collection('measurements').find(
         { synced: false },
