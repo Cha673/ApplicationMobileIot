@@ -209,6 +209,15 @@ Schéma de notre nouvelle architecture
 
 ## Règles de flux J3
 
+- **Deux zones MongoDB distinctes** :
+  - `raw_events` est la zone **brute** : le payload MQTT original (chaîne brute, non parsée) y
+    est inséré immédiatement à la réception, avant toute validation. Tout message, valide ou non,
+    y est conservé. C'est la seule source permettant de retrouver le payload MQTT exact.
+  - `measurements` est la zone **validée intermédiaire** : elle ne contient que des mesures
+    ayant passé les trois couches de validation. Les champs y sont typés (scalaires), les objets
+    imbriqués aplatis (`temperature.value` → `temperature`), et les champs inconnus du schéma
+    Zod supprimés (mode strip). `received_at` reflète l'heure de traitement batch (≤ 5 s après
+    la réception MQTT réelle, qui est dans `raw_events.received_at`).
 - **Réception immédiate** : tout payload telemetry est stocké dans `raw_events` (MongoDB, `status=pending`) sans aucune validation dès sa réception MQTT. Aucun message n'est perdu avant traitement.
 - **Validation différée** : `processRawBatch` traite les `raw_events` en lots toutes les 5 s — parsing JSON, validation Zod, plausibilité physique. Chaque rejet est marqué `markRejected` dans `raw_events`, loggué (`raw.rejected` avec `reason`) et inséré dans `rejected_events` (PostgreSQL). Aucun message invalide n'atteint `measurements`.
 - **Déduplication** : `existsById` sur `measurements` (MongoDB) avant toute écriture. Les doublons sont loggués (`raw.duplicate`), marqués `markDuplicate` dans `raw_events`, et insérés dans `duplicate_events` (PostgreSQL). La barrière `ON CONFLICT DO NOTHING` protège aussi la synchronisation vers PostgreSQL.

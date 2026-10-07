@@ -1,4 +1,15 @@
 services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 4s
+      retries: 12
+    restart: unless-stopped
+
   mongodb:
     image: mongo:7
     ports:
@@ -45,7 +56,8 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-campus}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-campus-demo}
       MONGO_URI: mongodb://mongodb:27017/campus
-      SYNC_INTERVAL_MS: ${SYNC_INTERVAL_MS:-5000}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
       FRESHNESS_THRESHOLD_MS: ${FRESHNESS_THRESHOLD_MS:-10000}
       DEVICES_PATH: /app/devices.json
     volumes:
@@ -58,6 +70,8 @@ services:
       postgres:
         condition: service_healthy
       mongodb:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     restart: unless-stopped
 
