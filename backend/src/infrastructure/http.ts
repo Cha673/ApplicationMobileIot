@@ -1,6 +1,8 @@
 import express from 'express';
 import type { DeviceRepository, MeasurementRepository } from '../domain/repositories';
 import type { CommandService } from '../application/commandService';
+import type { AlertService } from '../application/alertService';
+import type { Alert } from '../domain/types';
 
 const HISTORY_LIMIT = 50;
 const FRESHNESS_THRESHOLD_MS = Number(process.env['FRESHNESS_THRESHOLD_MS'] ?? 10000);
@@ -93,7 +95,7 @@ export function createHttpServer(
   measurements: MeasurementRepository,
   commandService: CommandService,
   health: HealthDependencies,
-
+  alertService?: AlertService,
 ): express.Application {
   const app = express();
   app.use(express.json());
@@ -112,8 +114,15 @@ export function createHttpServer(
     res.status(status.status === 'down' ? 503 : 200).json(status);
   });
 
+  app.get('/api/alerts', async (_req, res) => {
+    const active = alertService ? await alertService.findActive() : [];
+    res.json(active);
+  });
+
   app.get('/api/rooms', async (_req, res) => {
     const allDevices = await devices.findAll();
+    const activeAlerts: Alert[] = alertService ? await alertService.findActive() : [];
+    const alertByRoom = new Map(activeAlerts.map((a) => [a.roomId, a]));
     const rooms = await Promise.all(
       allDevices.map(async (device) => ({
         roomId: device.roomId,
@@ -125,6 +134,7 @@ export function createHttpServer(
         isStale: isStale(device.lastTelemetryAt),
         ventilation: device.ventilation,
         latestMeasurement: await measurements.findLatestByDevice(device.deviceId),
+        activeAlert: alertByRoom.get(device.roomId) ?? null,
       })),
     );
     res.json(rooms);
@@ -137,6 +147,9 @@ export function createHttpServer(
       res.status(404).json({ error: 'Room not found' });
       return;
     }
+    const activeAlert = alertService
+      ? await alertService.findActive().then((alerts) => alerts.find((a) => a.roomId === device.roomId) ?? null)
+      : null;
 
     res.json({
       roomId: device.roomId,
@@ -148,6 +161,7 @@ export function createHttpServer(
       isStale: isStale(device.lastTelemetryAt),
       ventilation: device.ventilation,
       latestMeasurement: await measurements.findLatestByDevice(device.deviceId),
+      activeAlert,
     });
   });
 

@@ -8,6 +8,7 @@ import {
   PgDeviceRepository,
   PgEventRepository,
   PgCommandRepository,
+  PgAlertRepository,
 } from './infrastructure/database';
 import { createMongoClient, initMongo, MongoMeasurementRepository, MongoRawEventRepository } from './infrastructure/mongo';
 import { FallbackMeasurementRepository } from './infrastructure/fallback';
@@ -15,20 +16,21 @@ import { connectMqtt } from './infrastructure/mqtt';
 import { createHttpServer } from './infrastructure/http';
 import { TelemetryService } from './application/telemetryService';
 import { CommandService } from './application/commandService';
+import { AlertService } from './application/alertService';
 import { startIngestWorker } from './workers/ingestWorker';
 import { startSyncWorker } from './workers/syncWorker';
 import { logger } from './infrastructure/logger';
 
-const MQTT_HOST     = process.env['MQTT_HOST']     ?? 'localhost';
-const MQTT_PORT     = parseInt(process.env['MQTT_PORT']     ?? '1883', 10);
-const MQTT_USER     = process.env['MQTT_USER']     ?? 'backend';
+const MQTT_HOST = process.env['MQTT_HOST'] ?? 'localhost';
+const MQTT_PORT = parseInt(process.env['MQTT_PORT'] ?? '1883', 10);
+const MQTT_USER = process.env['MQTT_USER'] ?? 'backend';
 const MQTT_PASSWORD = process.env['MQTT_PASSWORD'] ?? 'backend-demo';
-const API_PORT      = parseInt(process.env['API_PORT']      ?? '3000', 10);
-const DEVICES_PATH        = process.env['DEVICES_PATH']        ?? path.join(process.cwd(), 'devices.json');
-const REDIS_HOST          = process.env['REDIS_HOST']          ?? 'localhost';
-const REDIS_PORT          = parseInt(process.env['REDIS_PORT']          ?? '6379', 10);
-const COMMAND_TIMEOUT_MS  = parseInt(process.env['COMMAND_TIMEOUT_MS']  ?? '30000', 10);
-const INGEST_CONCURRENCY  = parseInt(process.env['INGEST_CONCURRENCY']  ?? '20', 10);
+const API_PORT = parseInt(process.env['API_PORT'] ?? '3000', 10);
+const DEVICES_PATH = process.env['DEVICES_PATH'] ?? path.join(process.cwd(), 'devices.json');
+const REDIS_HOST = process.env['REDIS_HOST'] ?? 'localhost';
+const REDIS_PORT = parseInt(process.env['REDIS_PORT'] ?? '6379', 10);
+const COMMAND_TIMEOUT_MS = parseInt(process.env['COMMAND_TIMEOUT_MS'] ?? '30000', 10);
+const INGEST_CONCURRENCY = parseInt(process.env['INGEST_CONCURRENCY'] ?? '20', 10);
 
 interface DeviceConfig {
   device_id: string;
@@ -53,22 +55,24 @@ async function main(): Promise<void> {
   const pool = createPool();
   await runMigrations(pool);
   const pgMeasurements = new PgMeasurementRepository(pool);
-  const deviceRepo     = new PgDeviceRepository(pool);
-  const eventRepo      = new PgEventRepository(pool);
-  const pgCommands     = new PgCommandRepository(pool);
+  const deviceRepo = new PgDeviceRepository(pool);
+  const eventRepo = new PgEventRepository(pool);
+  const pgCommands = new PgCommandRepository(pool);
+  const alertRepo = new PgAlertRepository(pool);
+  const alertService = new AlertService(alertRepo);
 
   const mongoClient = createMongoClient();
   await mongoClient.connect();
-  const mongoDB          = await initMongo(mongoClient);
+  const mongoDB = await initMongo(mongoClient);
   const mongoMeasurements = new MongoMeasurementRepository(mongoDB);
-  const mongoRawEvents    = new MongoRawEventRepository(mongoDB);
+  const mongoRawEvents = new MongoRawEventRepository(mongoDB);
   logger.info('init.mongodb_connected');
 
   const readMeasurements = new FallbackMeasurementRepository(pgMeasurements, mongoMeasurements);
 
   await seedDevices(deviceRepo);
 
-  const service = new TelemetryService(mongoRawEvents, mongoMeasurements, pgMeasurements, deviceRepo, eventRepo);
+  const service = new TelemetryService(mongoRawEvents, mongoMeasurements, pgMeasurements, deviceRepo, eventRepo, alertService);
 
   // Redis connection config partagée par les deux queues et les deux workers
   const redis = { host: REDIS_HOST, port: REDIS_PORT };
@@ -128,7 +132,7 @@ async function main(): Promise<void> {
         oldestUnsyncedAt: typeof oldest === 'string' ? oldest : null,
       };
     },
-  });
+  }, alertService);
   app.listen(API_PORT, '0.0.0.0', () => {
     logger.info('http.listening', { port: API_PORT });
   });

@@ -5,10 +5,10 @@
 #
 # Usage: ROOM=salle-a101 bash scenario/tests/scenario_j4_offline.sh
 set -euo pipefail
-ROOM=${ROOM:-salle-a101}
+ROOM=${ROOM:-salle-203}
 API=${API_URL:-http://localhost:3000}
 DEVICE=${DEVICE:-sensor-001}
-TIMEOUT_S=${TIMEOUT_S:-35}
+TIMEOUT_S=${TIMEOUT_S:-45}
 
 echo "=== J4 Anomalie 1 : objet silencieux → timeout ==="
 

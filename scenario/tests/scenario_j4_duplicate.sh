@@ -5,7 +5,7 @@
 #
 # Usage: ROOM=salle-a101 bash scenario/tests/scenario_j4_duplicate.sh
 set -euo pipefail
-ROOM=${ROOM:-salle-a101}
+ROOM=${ROOM:-salle-203}
 API=${API_URL:-http://localhost:3000}
 DEVICE=${DEVICE:-sensor-001}
 

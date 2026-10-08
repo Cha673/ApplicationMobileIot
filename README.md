@@ -167,10 +167,13 @@ docker compose run --rm tools watch --topic "campus/v1/devices/+/telemetry" --co
 ```
 1. Simulateur publie sur campus/v1/devices/sensor-001/telemetry (QoS 1)
 2. Mosquitto route le message au backend
-3. TelemetryService.processTelemetry valide les champs requis
-4. Si message_id déjà connu → doublon ignoré (log émis)
-5. PgMeasurementRepository.save → INSERT … ON CONFLICT DO NOTHING dans PostgreSQL
-6. GET /api/rooms/salle-203 → retourne latestMeasurement depuis PostgreSQL
+3. ingestQueue.add() — retour immédiat (<1 ms)
+4. ingestWorker : parsing JSON, validation Zod, plausibilité physique
+5. Si message_id déjà connu → doublon ignoré (log raw.duplicate)
+6. MongoDB measurements.save (synced=false)
+7. AlertService.evaluate() → si CO₂ > 1500 ppm et pas d'alerte active → alert.triggered
+8. syncWorker : MongoDB → PostgreSQL (ON CONFLICT DO NOTHING)
+9. GET /api/rooms/salle-203 → latestMeasurement + activeAlert depuis PostgreSQL
 ```
 
 ### Déduplication
@@ -228,15 +231,42 @@ docker compose up -d --build --wait
 
 ---
 
+## Alertes CO₂
+
+Une règle d'alerte surveille le CO₂ de chaque salle :
+
+- **Seuil de déclenchement** : CO₂ > 1 500 ppm → une alerte `co2_high` est créée (une seule, pas une par message).
+- **Retour à la normale** : CO₂ ≤ 1 200 ppm → l'alerte est résolue.
+- **Affichage mobile** : les salles en alerte affichent un badge rouge dans la liste et une bannière dans le détail.
+
+```sh
+# Voir les alertes actives
+curl http://localhost:3000/api/alerts
+
+# Déclencher une alerte sur sensor-001 (CO₂ passe à 1 800 ppm)
+docker compose run --rm tools incident sensor-001 high-co2
+
+# Résoudre (CO₂ revient à ~600 ppm)
+docker compose run --rm tools incident sensor-001 normal-co2
+
+# Scénario complet (déclencher, vérifier la non-duplication, résoudre)
+ROOM=salle-203 DEVICE=sensor-001 bash scenario/tests/scenario_j5_alert.sh
+```
+
+---
+
 ## Endpoints API
 
 | Méthode | Route | Description |
 |---------|-------|-------------|
 | GET | `/api/health` | Santé du backend |
-| GET | `/api/rooms` | Liste des salles avec dernière mesure |
-| GET | `/api/rooms/:roomId` | Détail d'une salle |
+| GET | `/api/rooms` | Liste des salles avec dernière mesure et alerte active |
+| GET | `/api/rooms/:roomId` | Détail d'une salle avec alerte active |
 | GET | `/api/rooms/:roomId/history` | Historique des 50 dernières mesures |
+| GET | `/api/alerts` | Liste des alertes actives |
 | GET | `/api/devices` | Liste des capteurs avec état de connexion |
+| POST | `/api/rooms/:roomId/commands` | Envoyer une commande (ex : ventilation) |
+| GET | `/api/commands/:commandId` | Statut d'une commande |
 
 ---
 
