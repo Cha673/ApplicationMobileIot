@@ -9,7 +9,7 @@ import {
   View,
 } from "react-native";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { fetchRooms, formatMeasurementTimestamp, type Room } from "../api";
+import { fetchRooms, formatMeasurementTimestamp, type Room, type Alert } from "../api";
 import { showDataUpdatedNotification } from "../notifications";
 import { useAppStore } from "../store/useAppStore";
 
@@ -133,6 +133,16 @@ export function RoomsScreen(): React.ReactElement {
   );
 }
 
+function AlertBadge({ alert }: { alert: Alert }): React.ReactElement {
+  return (
+    <View style={styles.alertBadge}>
+      <Text style={styles.alertBadgeText}>
+        CO₂ élevé — {Math.round(alert.triggeredValue)} ppm
+      </Text>
+    </View>
+  );
+}
+
 function RoomRow({
   room,
   appOffline,
@@ -152,6 +162,7 @@ function RoomRow({
           </Text>
         </View>
       </View>
+      {room.activeAlert && <AlertBadge alert={room.activeAlert} />}
       {m ? (
         <View style={styles.measures}>
           <Measure
@@ -262,4 +273,14 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   timestamp: { fontSize: 11, color: "#bbb", textAlign: "right", marginTop: 6 },
+  alertBadge: {
+    backgroundColor: "#fde8e8",
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    marginBottom: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: "#e74c3c",
+  },
+  alertBadgeText: { fontSize: 12, color: "#c0392b", fontWeight: "600" },
 });

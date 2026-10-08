@@ -7,6 +7,7 @@ import type {
   RawEventRepository,
 } from '../domain/repositories';
 import type { Measurement, RejectedEvent } from '../domain/types';
+import type { AlertService } from './alertService';
 import { logger } from '../infrastructure/logger';
 
 const BATCH_SIZE = parseInt(process.env['SYNC_BATCH_SIZE'] ?? '1000', 10);
@@ -18,6 +19,7 @@ export class TelemetryService {
     private readonly measurements: MeasurementRepository,
     private readonly devices: DeviceRepository,
     private readonly events: EventRepository,
+    private readonly alertService?: AlertService,
   ) {}
 
   // Called by ingestWorker — saves raw, validates, writes to MongoDB measurements.
@@ -119,6 +121,12 @@ export class TelemetryService {
       co2: msg.co2,
       status: 'accepted',
     });
+
+    if (this.alertService) {
+      await this.alertService.evaluate(msg).catch((err: unknown) =>
+        logger.warn('alert.evaluate_failed', { error: String(err) }),
+      );
+    }
 
     await onValidated();
   }

@@ -1,4 +1,4 @@
-import type { Measurement, Device, RejectedEvent, DuplicateEvent, RawEvent, Command } from './types';
+import type { Measurement, Device, RejectedEvent, DuplicateEvent, RawEvent, Command, Alert } from './types';
 
 export interface MeasurementRepository {
   save(measurement: Measurement): Promise<void>;
@@ -53,4 +53,11 @@ export interface CommandRepository {
   markTimeout(commandId: string): Promise<void>;
   findExpiredPending(now: string): Promise<Command[]>;
   findByDevice(deviceId: string, limit: number): Promise<Command[]>;
+}
+
+export interface AlertRepository {
+  open(alert: Alert): Promise<void>;
+  resolve(id: string, resolvedAt: string, resolvedValue: number): Promise<void>;
+  findActiveByRoomAndRule(roomId: string, rule: string): Promise<Alert | null>;
+  findActive(): Promise<Alert[]>;
 }

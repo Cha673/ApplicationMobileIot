@@ -1,6 +1,6 @@
 import { Pool } from 'pg';
-import type { MeasurementRepository, DeviceRepository, EventRepository, CommandRepository } from '../domain/repositories';
-import type { Measurement, Device, RejectedEvent, DuplicateEvent, Command, CommandStatus } from '../domain/types';
+import type { MeasurementRepository, DeviceRepository, EventRepository, CommandRepository, AlertRepository } from '../domain/repositories';
+import type { Measurement, Device, RejectedEvent, DuplicateEvent, Command, CommandStatus, Alert } from '../domain/types';
 
 export function createPool(): Pool {
   return new Pool({
@@ -81,6 +81,21 @@ export async function runMigrations(pool: Pool): Promise<void> {
 
     CREATE INDEX IF NOT EXISTS idx_commands_pending
       ON commands (expires_at) WHERE status IN ('PENDING', 'SENT');
+
+    CREATE TABLE IF NOT EXISTS alerts (
+      id              TEXT PRIMARY KEY,
+      room_id         TEXT NOT NULL,
+      device_id       TEXT NOT NULL,
+      rule            TEXT NOT NULL,
+      status          TEXT NOT NULL DEFAULT 'active',
+      triggered_at    TEXT NOT NULL,
+      resolved_at     TEXT,
+      triggered_value REAL NOT NULL,
+      resolved_value  REAL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_alerts_room_rule_status
+      ON alerts (room_id, rule, status);
   `);
 
   // Additive column migrations (idempotent)
@@ -332,5 +347,53 @@ function toCommand(r: Record<string, unknown>): Command {
     ackedAt:    r["acked_at"] as string | null,
     expiresAt:  r["expires_at"] as string,
     ackPayload: r["ack_payload"] ? JSON.parse(r["ack_payload"] as string) as Record<string, unknown> : null,
+  };
+}
+
+export class PgAlertRepository implements AlertRepository {
+  constructor(private readonly pool: Pool) {}
+
+  async open(alert: Alert): Promise<void> {
+    await this.pool.query(
+      `INSERT INTO alerts (id, room_id, device_id, rule, status, triggered_at, resolved_at, triggered_value, resolved_value)
+       VALUES ($1, $2, $3, $4, 'active', $5, NULL, $6, NULL)`,
+      [alert.id, alert.roomId, alert.deviceId, alert.rule, alert.triggeredAt, alert.triggeredValue],
+    );
+  }
+
+  async resolve(id: string, resolvedAt: string, resolvedValue: number): Promise<void> {
+    await this.pool.query(
+      `UPDATE alerts SET status = 'resolved', resolved_at = $1, resolved_value = $2 WHERE id = $3`,
+      [resolvedAt, resolvedValue, id],
+    );
+  }
+
+  async findActiveByRoomAndRule(roomId: string, rule: string): Promise<Alert | null> {
+    const result = await this.pool.query(
+      `SELECT * FROM alerts WHERE room_id = $1 AND rule = $2 AND status = 'active' ORDER BY triggered_at DESC LIMIT 1`,
+      [roomId, rule],
+    );
+    return result.rows[0] ? toAlert(result.rows[0]) : null;
+  }
+
+  async findActive(): Promise<Alert[]> {
+    const result = await this.pool.query(
+      `SELECT * FROM alerts WHERE status = 'active' ORDER BY triggered_at DESC`,
+    );
+    return result.rows.map(toAlert);
+  }
+}
+
+function toAlert(r: Record<string, unknown>): Alert {
+  return {
+    id:             r["id"] as string,
+    roomId:         r["room_id"] as string,
+    deviceId:       r["device_id"] as string,
+    rule:           r["rule"] as string,
+    status:         r["status"] as 'active' | 'resolved',
+    triggeredAt:    r["triggered_at"] as string,
+    resolvedAt:     r["resolved_at"] as string | null,
+    triggeredValue: r["triggered_value"] as number,
+    resolvedValue:  r["resolved_value"] as number | null,
   };
 }

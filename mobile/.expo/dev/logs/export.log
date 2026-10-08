@@ -1,0 +1,8 @@
+{"_e":"root:init","_t":1791382272339,"format":"v0-jsonl","version":"57.0.24"}
+{"_e":"env:mode","_t":1791382272495,"nodeEnv":"production","babelEnv":"production","mode":"production"}
+{"_e":"env:load","_t":1791382272497,"mode":"production","files":["../../../.env.local"],"env":{"EXPO_PUBLIC_API_URL":"http://172.20.10.2:3000"}}
+{"_e":"devserver:start","_t":1791382272628,"mode":"production","web":true,"baseUrl":"","asyncRoutes":false,"routerRoot":"../../../app","serverComponents":false,"serverActions":false,"serverRendering":false,"apiRoutes":false,"exporting":true}
+{"_e":"metro:config","_t":1791382272893,"serverRoot":"../../..","projectRoot":"../../..","exporting":true,"flags":{"autolinkingModuleResolution":false,"serverActions":false,"serverComponents":false,"reactCompiler":false,"optimizeGraph":false,"treeshaking":false,"logbox":false}}
+{"_e":"metro:instantiate","_t":1791382273005,"atlas":false,"workers":6,"host":null,"port":null}
+{"_e":"metro:bundling:started","_t":1791382273203,"id":"1","platform":"android","environment":null,"entry":"node_modules/expo/AppEntry.js"}
+{"_e":"metro:bundling:done","_t":1791382284071,"id":"1","total":711,"ms":10868.574833}

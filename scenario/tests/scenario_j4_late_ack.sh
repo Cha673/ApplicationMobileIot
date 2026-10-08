@@ -6,10 +6,10 @@
 #
 # Usage: ROOM=salle-a101 bash scenario/tests/scenario_j4_late_ack.sh
 set -euo pipefail
-ROOM=${ROOM:-salle-a101}
+ROOM=${ROOM:-salle-203}
 API=${API_URL:-http://localhost:3000}
 DEVICE=${DEVICE:-sensor-001}
-TIMEOUT_S=${TIMEOUT_S:-35}
+TIMEOUT_S=${TIMEOUT_S:-45}
 
 echo "=== J4 Anomalie 2 : ACK tardif après timeout ==="
 

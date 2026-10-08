@@ -37,6 +37,18 @@ export function formatMeasurementTimestamp(observedAt: string): string {
   });
 }
 
+export interface Alert {
+  id: string;
+  roomId: string;
+  deviceId: string;
+  rule: string;
+  status: 'active' | 'resolved';
+  triggeredAt: string;
+  resolvedAt: string | null;
+  triggeredValue: number;
+  resolvedValue: number | null;
+}
+
 export interface Room {
   roomId: string;
   label: string;
@@ -47,6 +59,7 @@ export interface Room {
   lastTelemetryAt: string | null;
   latestMeasurement: LatestMeasurement | null;
   ventilation: boolean;
+  activeAlert: Alert | null;
 }
 
 export async function fetchRooms(): Promise<Room[]> {

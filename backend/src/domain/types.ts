@@ -59,3 +59,15 @@ export interface RawEvent {
   error?: string;
   processedAt?: string;
 }
+
+export interface Alert {
+  id: string;
+  roomId: string;
+  deviceId: string;
+  rule: string;
+  status: 'active' | 'resolved';
+  triggeredAt: string;
+  resolvedAt: string | null;
+  triggeredValue: number;
+  resolvedValue: number | null;
+}

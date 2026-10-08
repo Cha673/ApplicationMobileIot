@@ -375,3 +375,61 @@ Schéma de notre nouvelle architecture
 - **ACK tardif :** si l'ACK arrive après le `TIMEOUT`, le statut reste `TIMEOUT`. Le backend logge `command.ack_after_timeout` pour garder une trace sans modifier l'état.
 - **Idempotence :** le simulateur ne ré-exécute jamais une action pour un `commandId` déjà traité. Le backend ignore les ACK dupliqués (`command.ack_duplicate`).
 - **État ventilation :** le backend s'abonne à `campus/v1/devices/+/state` et met à jour `devices.ventilation` à chaque publication de l'objet.
+
+# Architecture J5 — Alertes, observabilité et exploitabilité
+
+## Ajouts J5
+
+### Règle d'alerte CO₂
+
+`AlertService.evaluate(measurement)` est appelé dans `ingestWorker` après chaque mesure acceptée.
+
+**Logique :**
+- CO₂ > 1 500 ppm ET aucune alerte `co2_high` active pour cette salle → créer une alerte, log `alert.triggered`.
+- CO₂ ≤ 1 200 ppm ET alerte `co2_high` active → résoudre l'alerte, log `alert.resolved`.
+- Sinon → rien (pas de doublon, pas de bruit).
+
+**Table PostgreSQL `alerts` :**
+
+| Colonne | Type | Description |
+|---|---|---|
+| `id` | TEXT PK | UUID de l'alerte |
+| `room_id` | TEXT | Salle concernée |
+| `device_id` | TEXT | Capteur source |
+| `rule` | TEXT | Nom de la règle (`co2_high`) |
+| `status` | TEXT | `active` ou `resolved` |
+| `triggered_at` | TEXT | ISO 8601 du déclenchement |
+| `resolved_at` | TEXT | ISO 8601 de la résolution (null si active) |
+| `triggered_value` | REAL | Valeur CO₂ au déclenchement |
+| `resolved_value` | REAL | Valeur CO₂ à la résolution (null si active) |
+
+**Endpoints :**
+- `GET /api/alerts` — liste des alertes actives
+- `GET /api/rooms` et `GET /api/rooms/{id}` — inclut maintenant `activeAlert: Alert | null`
+
+### Bornes sur l'historique
+
+- `HISTORY_LIMIT = 50` dans `http.ts` : l'API borne les lectures. Le paramètre `?limit=` est plafonné à 50.
+- L'historique complet reste en PostgreSQL ; la borne est uniquement à la lecture.
+
+### Affichage mobile des alertes
+
+- **Liste des salles :** badge rouge « CO₂ élevé — NNN ppm » sur les cartes des salles en alerte.
+- **Détail d'une salle :** bannière rouge « Alerte CO₂ élevé » avec la valeur et l'horodatage du déclenchement.
+
+## Flux J5 — Évaluation des alertes
+
+```
+ingestWorker.ingestOne()
+  ↓ measurement sauvegardé (MongoDB + PG via sync)
+  ↓ alertService.evaluate(measurement)
+      ↓ findActiveByRoomAndRule(roomId, 'co2_high') → PG
+      ↓ si CO₂ > 1500 ppm ET pas d'alerte active → alerts.open() + log alert.triggered
+      ↓ si CO₂ ≤ 1200 ppm ET alerte active     → alerts.resolve() + log alert.resolved
+      ↓ sinon → rien
+```
+
+## Tables PostgreSQL J5
+
+Tables ajoutées à J5 : `alerts`  
+Tables existantes : `measurements`, `devices`, `rejected_events`, `duplicate_events`, `commands`
