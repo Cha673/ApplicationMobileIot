@@ -5,6 +5,8 @@
 # Usage: ROOM=salle-203 DEVICE=sensor-001 bash scenario/tests/scenario_j5_alert.sh
 set -euo pipefail
 
+FAIL=0
+
 ROOM=${ROOM:-salle-203}
 API=${API_URL:-http://localhost:3000}
 DEVICE=${DEVICE:-sensor-001}
@@ -45,6 +47,7 @@ if [ "$ALERT_COUNT" -ge 1 ]; then
   echo "✓ Alerte déclenchée pour ${ROOM}"
 else
   echo "✗ Aucune alerte trouvée pour ${ROOM}"
+  FAIL=1
 fi
 
 ALERT_ID=$(echo "$ALERTS" | python3 -c "import sys,json; data=json.load(sys.stdin); items=[a for a in data if a['roomId']=='${ROOM}']; print(items[0]['id'] if items else '')" 2>/dev/null || echo "")
@@ -68,6 +71,7 @@ if [ "$ALERT_COUNT2" -eq 1 ]; then
   echo "✓ Pas de duplication — une seule alerte active"
 else
   echo "✗ Duplication détectée ou alerte manquante"
+  FAIL=1
 fi
 
 echo ""
@@ -89,6 +93,7 @@ if [ "$ALERT_COUNT3" -eq 0 ]; then
   echo "✓ Alerte résolue — aucune alerte active pour ${ROOM}"
 else
   echo "✗ Alerte toujours active pour ${ROOM}"
+  FAIL=1
 fi
 
 echo ""
@@ -99,3 +104,4 @@ fi
 
 echo ""
 echo "=== Scénario J5 terminé ==="
+exit $FAIL

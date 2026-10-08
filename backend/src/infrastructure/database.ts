@@ -98,6 +98,11 @@ export async function runMigrations(pool: Pool): Promise<void> {
       ON alerts (room_id, rule, status);
   `);
 
+  await pool.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_alerts_active_room_rule
+      ON alerts (room_id, rule) WHERE status = 'active';
+  `);
+
   // Additive column migrations (idempotent)
   await pool.query(`
     ALTER TABLE devices ADD COLUMN IF NOT EXISTS last_telemetry_at TEXT;
@@ -356,7 +361,8 @@ export class PgAlertRepository implements AlertRepository {
   async open(alert: Alert): Promise<void> {
     await this.pool.query(
       `INSERT INTO alerts (id, room_id, device_id, rule, status, triggered_at, resolved_at, triggered_value, resolved_value)
-       VALUES ($1, $2, $3, $4, 'active', $5, NULL, $6, NULL)`,
+       VALUES ($1, $2, $3, $4, 'active', $5, NULL, $6, NULL)
+       ON CONFLICT (room_id, rule) WHERE status = 'active' DO NOTHING`,
       [alert.id, alert.roomId, alert.deviceId, alert.rule, alert.triggeredAt, alert.triggeredValue],
     );
   }
