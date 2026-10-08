@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import type { Room } from '../api';
+import type { Room, Alert } from '../api';
 
 function formatDate(iso: string): string {
   const d = new Date(iso);
@@ -19,8 +19,11 @@ export function RoomCard({ room, onPress }: Props): React.ReactElement {
     <View style={styles.card}>
       <View style={styles.header}>
         <Text style={styles.label}>{room.label}</Text>
-        <View style={[styles.badge, room.isOnline ? styles.online : styles.offline]}>
-          <Text style={styles.badgeText}>{room.isOnline ? 'En ligne' : 'Hors ligne'}</Text>
+        <View style={styles.badges}>
+          {room.activeAlert && <AlertBadge alert={room.activeAlert} />}
+          <View style={[styles.badge, room.isOnline ? styles.online : styles.offline]}>
+            <Text style={styles.badgeText}>{room.isOnline ? 'En ligne' : 'Hors ligne'}</Text>
+          </View>
         </View>
       </View>
 
@@ -49,6 +52,14 @@ export function RoomCard({ room, onPress }: Props): React.ReactElement {
   );
 }
 
+function AlertBadge({ alert }: { alert: Alert }): React.ReactElement {
+  return (
+    <View style={styles.alertBadge}>
+      <Text style={styles.alertBadgeText}>⚠ CO₂ {Math.round(alert.triggeredValue)} ppm</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   card: {
     backgroundColor: '#fff',
@@ -72,6 +83,24 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: '#1a1a1a',
+  },
+  badges: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  alertBadge: {
+    backgroundColor: '#fde8e8',
+    borderWidth: 1,
+    borderColor: '#e74c3c',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  alertBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#c0392b',
   },
   badge: {
     paddingHorizontal: 10,
